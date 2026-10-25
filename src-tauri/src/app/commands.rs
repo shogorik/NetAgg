@@ -16,6 +16,36 @@ use crate::sys;
 
 /// Passed to the elevated copy so it knows to wait for this one to exit.
 pub const ELEVATED_ARG: &str = "--elevated";
+/// A relaunch younger than this that still lacks administrator rights
+/// means elevation failed. An older one is an argument the updater carried
+/// over from the elevated copy it replaced (it restarts the new version with
+/// the old one's arguments, without the rights).
+const FRESH_RELAUNCH_SECS: u64 = 60;
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+}
+
+/// `--elevated=<when>`, the time stamping it as this relaunch.
+fn elevated_arg() -> String {
+    format!("{ELEVATED_ARG}={}", now_secs())
+}
+
+/// From the command line: whether this copy was relaunched for the rights
+/// (so it waits for the old copy to go), and whether that was just now.
+pub fn relaunch_info(args: &[String]) -> (bool, bool) {
+    args.iter()
+        .find(|a| *a == ELEVATED_ARG || a.starts_with(&format!("{ELEVATED_ARG}=")))
+        .map_or((false, false), |arg| {
+            let fresh = arg
+                .split_once('=')
+                .and_then(|(_, at)| at.parse::<u64>().ok())
+                .is_some_and(|at| now_secs().saturating_sub(at) < FRESH_RELAUNCH_SECS);
+            (true, fresh)
+        })
+}
 /// Passed along with `ELEVATED_ARG` when the user asked to turn on.
 pub const TURN_ON_ARG: &str = "--turn-on";
 
@@ -38,7 +68,7 @@ pub async fn switch(app: &AppHandle, on: bool) -> Result<(), String> {
     } else if sys::is_elevated() || sys::elevates_in_place() {
         state.turn_on().await
     } else {
-        sys::relaunch_elevated(&format!("{ELEVATED_ARG} {TURN_ON_ARG}"))
+        sys::relaunch_elevated(&format!("{} {TURN_ON_ARG}", elevated_arg()))
             .map_err(|e| e.to_string())?;
         app.exit(0);
         Ok(())
@@ -255,6 +285,24 @@ pub async fn prepare_update_install(app: AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_a_fresh_relaunch_counts_as_failed_elevation() {
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(relaunch_info(&args(&["netagg"])), (false, false));
+        assert_eq!(
+            relaunch_info(&args(&["netagg", &elevated_arg(), TURN_ON_ARG])),
+            (true, true)
+        );
+        // Carried over by the updater from an elevated copy started long ago.
+        let old = format!("{ELEVATED_ARG}={}", now_secs() - 3600);
+        assert_eq!(relaunch_info(&args(&["netagg", &old])), (true, false));
+        // 1.3.4 and older passed no time.
+        assert_eq!(
+            relaunch_info(&args(&["netagg", ELEVATED_ARG])),
+            (true, false)
+        );
+    }
 
     #[test]
     fn dns_servers_are_checked() {

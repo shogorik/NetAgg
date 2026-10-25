@@ -27,8 +27,11 @@ pub fn run() {
     if std::env::var_os("GDK_BACKEND").is_none() && std::env::var_os("DISPLAY").is_some() {
         std::env::set_var("GDK_BACKEND", "x11");
     }
-    let relaunched = has_arg(commands::ELEVATED_ARG);
-    let turn_on = has_arg(commands::TURN_ON_ARG);
+    let args: Vec<String> = std::env::args().collect();
+    let (relaunched, just_relaunched) = commands::relaunch_info(&args);
+    // Only from a relaunch just now: the updater carries old arguments over, and
+    // the saved state, not an old "--turn-on", decides then.
+    let turn_on = just_relaunched && has_arg(commands::TURN_ON_ARG);
     let at_sign_in = has_arg(autostart::AUTOSTART_ARG);
     // The elevated copy waits for the copy that launched it to exit.
     let wait = if relaunched {
@@ -88,8 +91,9 @@ pub fn run() {
             let state = AppState::new(app.path().app_config_dir()?, autostart::is_enabled());
             // NetAgg comes back the way it was left. Without the rights to turn
             // on, `switch` relaunches it with them (UAC), as the toggle does;
-            // a copy that was already relaunched for them doesn't try again.
-            let can_start = elevated || sys::elevates_in_place() || !relaunched;
+            // a copy relaunched for them just now that still lacks them doesn't
+            // try again (see `commands::relaunch_info`).
+            let can_start = elevated || sys::elevates_in_place() || !just_relaunched;
             let start = can_start && (turn_on || state.settings().on);
             state.apply_default_route();
             restore_start_on_login(&state);
