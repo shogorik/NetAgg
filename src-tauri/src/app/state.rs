@@ -52,7 +52,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("netagg-import-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let old = root.join(MULTIPATH_DIR);
-        let new = root.join("dev.netagg.app");
+        let new = root.join("dev.netagg");
         std::fs::create_dir_all(&old).unwrap();
         std::fs::write(old.join("settings.json"), r#"{"dnsMode":"manual"}"#).unwrap();
 

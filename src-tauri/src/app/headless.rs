@@ -15,7 +15,7 @@ pub const HEADLESS_ARG: &str = "--headless";
 /// Followed by the folder for settings and usage.
 const CONFIG_ARG: &str = "--config";
 /// The app's identifier in `tauri.conf.json`, which names its config folder.
-const IDENTIFIER: &str = "dev.netagg.app";
+const IDENTIFIER: &str = "dev.netagg";
 
 #[cfg(windows)]
 const MISSING_RIGHTS: &str = "NetAgg needs administrator rights: run it from an elevated terminal";

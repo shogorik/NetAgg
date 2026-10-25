@@ -276,7 +276,7 @@ mod launch_agent {
 
     use super::AUTOSTART_ARG;
 
-    const LABEL: &str = "dev.netagg.app";
+    const LABEL: &str = "dev.netagg";
 
     pub fn is_enabled() -> bool {
         agent_path().is_some_and(|path| path.exists())
@@ -355,13 +355,13 @@ mod launch_agent {
             ));
             assert!(text.contains("<string>--autostart</string>"));
             assert!(text.contains("<key>RunAtLoad</key>\n  <true/>"));
-            assert!(text.contains("<string>dev.netagg.app</string>"));
+            assert!(text.contains("<string>dev.netagg</string>"));
         }
 
         #[test]
         fn agent_lives_in_the_users_library() {
             let path = agent_path().unwrap();
-            assert!(path.ends_with("Library/LaunchAgents/dev.netagg.app.plist"));
+            assert!(path.ends_with("Library/LaunchAgents/dev.netagg.plist"));
         }
     }
 }

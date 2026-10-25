@@ -226,17 +226,21 @@ async fn open_adapter(dns: Vec<IpAddr>) -> io::Result<(tun::AsyncDevice, Vec<Rou
     Ok((device, add_capture(if_index)?, if_index))
 }
 
-/// `wintun.dll` is installed in `resources/` next to the executable; in
-/// development it's read from the source tree.
+/// `wintun.dll` is installed in `resources/` next to the executable; a debug
+/// build falls back to the source tree. A release never does: an
+/// administrator process must not load a DLL from a user-writable folder, so
+/// without its own copy it reports the DLL missing instead.
 #[cfg(windows)]
 fn wintun_path() -> PathBuf {
     let installed = std::env::current_exe()
         .ok()
-        .and_then(|exe| Some(exe.parent()?.join("resources/wintun.dll")));
-    match installed {
-        Some(path) if path.is_file() => path,
-        _ => PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/wintun.dll")),
+        .and_then(|exe| Some(exe.parent()?.join("resources/wintun.dll")))
+        .unwrap_or_default();
+    #[cfg(debug_assertions)]
+    if !installed.is_file() {
+        return PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/wintun.dll"));
     }
+    installed
 }
 
 /// The routes that send everything into the adapter, IPv6 included: it's
