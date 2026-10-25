@@ -19,6 +19,9 @@ use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken}
 
 use super::elevation::wide;
 
+/// S-1-5-18, for checking as the service would, whoever runs the check.
+pub(super) const SYSTEM_SID: [u8; 12] = [1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0];
+
 const ACCESS_ALLOWED_ACE_TYPE: u8 = 0;
 /// Rights that let someone change what runs: write or append (add a file
 /// or folder), delete a child, delete, change permissions or owner, and the
@@ -54,6 +57,13 @@ fn guarded_paths() -> io::Result<Vec<PathBuf>> {
 pub fn check_install_secure() -> io::Result<()> {
     let user = current_user_sid()?;
     for path in guarded_paths()? {
+        // A junction or link would have the checks below look at its target.
+        if std::fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err(io::Error::other(format!(
+                "{} is a link, so NetAgg won't trust it. Reinstall NetAgg.",
+                path.display()
+            )));
+        }
         if path.exists() && changeable_by_users(&path, &user.0)? {
             return Err(io::Error::other(format!(
                 "{} can be changed without administrator rights, so other programs could take over NetAgg's \
@@ -115,7 +125,7 @@ fn is_ordinary(sid: PSID, user: &[u8]) -> bool {
     }
 }
 
-fn changeable_by_users(path: &Path, user: &[u8]) -> io::Result<bool> {
+pub(super) fn changeable_by_users(path: &Path, user: &[u8]) -> io::Result<bool> {
     let name = wide(&path.to_string_lossy());
     let mut owner: PSID = null_mut();
     let mut dacl: *mut ACL = null_mut();
@@ -218,7 +228,7 @@ mod tests {
     /// install folder): that mustn't count as ordinary users changing it.
     #[test]
     fn running_as_system_is_not_an_ordinary_user() {
-        let system: [u8; 12] = [1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0];
+        let system = SYSTEM_SID;
         let system32 = PathBuf::from(std::env::var("SystemRoot").unwrap()).join("System32");
         assert!(!changeable_by_users(&system32, &system).unwrap());
         assert!(changeable_by_users(&std::env::temp_dir(), &system).unwrap());

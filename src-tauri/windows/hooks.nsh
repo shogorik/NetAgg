@@ -26,24 +26,16 @@
   nsExec::Exec 'icacls "$INSTDIR" /setowner *S-1-5-32-544 /T /C /Q'
 
   ; The service's settings (they choose its DNS servers), usage and log, in
-  ; ProgramData\NetAgg: the same permissions. Only the folder's owner is set:
-  ; a file someone else put there first keeps its owner, and the service
-  ; refuses to turn on with it.
-  ReadEnvStr $0 ProgramData
-  ReadEnvStr $1 APPDATA
-  CreateDirectory "$0\NetAgg"
-  ; Versions before the service kept them in the user's AppData.
-  ${IfNot} ${FileExists} "$0\NetAgg\settings.json"
-  ${AndIf} ${FileExists} "$1\dev.netagg\settings.json"
-    CopyFiles /SILENT "$1\dev.netagg\settings.json" "$0\NetAgg"
+  ; ProgramData\NetAgg. Anyone may create folders in ProgramData, so NetAgg
+  ; itself checks it: a link there is removed (never followed), a folder
+  ; someone else could have changed is moved aside, and it's created with its
+  ; permissions (Administrators and SYSTEM change, Users read) from the start.
+  ; The installing user's settings from before the service are taken over.
+  nsExec::ExecToLog '"$INSTDIR\netagg.exe" --prepare-data-dir'
+  Pop $0
+  ${If} $0 <> 0
+    DetailPrint "NetAgg couldn't make its settings folder safe; it won't turn on until it can."
   ${EndIf}
-  ${IfNot} ${FileExists} "$0\NetAgg\usage.json"
-  ${AndIf} ${FileExists} "$1\dev.netagg\usage.json"
-    CopyFiles /SILENT "$1\dev.netagg\usage.json" "$0\NetAgg"
-  ${EndIf}
-  nsExec::Exec 'icacls "$0\NetAgg" /setowner *S-1-5-32-544 /C /Q'
-  nsExec::Exec 'icacls "$0\NetAgg" /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX'
-  nsExec::Exec 'icacls "$0\NetAgg\*" /reset /T /C /Q'
 
   ; Versions before the service started at sign-in through an elevated
   ; scheduled task; the tray app now uses the user's Run key.

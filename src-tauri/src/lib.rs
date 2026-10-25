@@ -22,6 +22,10 @@ pub fn run() {
         std::process::exit(app::service::run());
     }
     #[cfg(windows)]
+    if has_arg(app::service::PREPARE_DATA_DIR_ARG) {
+        std::process::exit(app::service::run_prepare_data_dir());
+    }
+    #[cfg(windows)]
     if has_arg(app::service::ADMIN_REQUEST_ARG) {
         let args: Vec<String> = std::env::args().collect();
         std::process::exit(app::service::run_admin_request(&args));
@@ -103,7 +107,9 @@ pub fn run() {
                 if elevated {
                     engine::clean_up_stale();
                 }
-                let state = app::state::AppState::new(app.path().app_config_dir()?);
+                let config_dir = app.path().app_config_dir()?;
+                app::state::import_from_multipath(&config_dir);
+                let state = app::state::AppState::new(config_dir);
                 state.apply_default_route();
                 Backend::Local(std::sync::Arc::new(state))
             };

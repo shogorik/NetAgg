@@ -23,6 +23,8 @@ use crate::{engine, sys};
 
 /// How the installer registers the service: `netagg.exe --service`.
 pub const SERVICE_ARG: &str = "--service";
+/// The installer's step that makes the data folder safe (`sys::prepare_data_dir`).
+pub const PREPARE_DATA_DIR_ARG: &str = "--prepare-data-dir";
 /// Followed by a request, hex-encoded JSON.
 pub const ADMIN_REQUEST_ARG: &str = "--admin-request";
 /// More than any request needs.
@@ -72,6 +74,11 @@ async fn serve(stop: impl std::future::Future<Output = ()>) -> u32 {
     let Some(data_dir) = sys::service_data_dir() else {
         return 2;
     };
+    // Before anything is written there (the log first).
+    if let Err(err) = sys::prepare_data_dir(&data_dir) {
+        eprintln!("unsafe data folder {}: {err}", data_dir.display());
+        return 3;
+    }
     logfile::init(&data_dir);
     log::info!(
         "NetAgg service {} started from {:?}",
@@ -247,6 +254,40 @@ pub async fn call(request: Request) -> Result<Value, String> {
             send(&Request::Status).await
         }
         reply => reply,
+    }
+}
+
+/// The installer's step: makes the data folder safe, then takes over the
+/// installing user's settings and usage from before the service, if the
+/// folder has none. Exit code 0 when the folder is safe to use, 1 otherwise.
+pub fn run_prepare_data_dir() -> i32 {
+    let Some(dir) = sys::service_data_dir().filter(|_| sys::is_elevated()) else {
+        return 1;
+    };
+    if let Err(err) = sys::prepare_data_dir(&dir) {
+        eprintln!("{err}");
+        return 1;
+    }
+    if let Some(old) = std::env::var_os("APPDATA").map(|a| Path::new(&a).join(OLD_CONFIG_DIR)) {
+        for name in ["settings.json", "usage.json"] {
+            take_over(&old.join(name), &dir.join(name));
+        }
+    }
+    0
+}
+
+/// The folder versions before the service kept settings in, in AppData.
+const OLD_CONFIG_DIR: &str = "dev.netagg";
+
+/// Copies `from` to `to` unless `to` exists or `from` isn't a plain file
+/// (a link could point the elevated installer anywhere). Written anew, so
+/// it gets the data folder's permissions.
+fn take_over(from: &Path, to: &Path) {
+    let plain = std::fs::symlink_metadata(from).is_ok_and(|m| m.file_type().is_file());
+    if plain && !to.exists() {
+        if let Ok(bytes) = std::fs::read(from) {
+            let _ = std::fs::write(to, bytes);
+        }
     }
 }
 

@@ -63,7 +63,10 @@ async fn serve(config_dir: PathBuf) -> i32 {
         return 1;
     }
     engine::clean_up_stale();
-    let state = AppState::new(config_dir);
+    let state = {
+        super::state::import_from_multipath(&config_dir);
+        AppState::new(config_dir)
+    };
     // Turning on is remembered for the app; a headless run shouldn't change it.
     let was_on = state.settings().on;
     tokio::spawn(health::run(state.links.clone(), state.health_stop()));

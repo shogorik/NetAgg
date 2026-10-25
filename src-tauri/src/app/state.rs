@@ -23,8 +23,10 @@ const STOP_TIMEOUT: Duration = Duration::from_secs(5);
 const MULTIPATH_DIR: &str = "dev.multipath.app";
 
 /// A first run takes over the settings and usage a MultiPath install left
-/// next to this config folder. Never overwrites, so it happens once.
-fn import_from_multipath(config_dir: &std::path::Path) {
+/// next to this config folder. Never overwrites, so it happens once. Only
+/// for the user's own config folder: next to the service's, in ProgramData,
+/// anyone could have left one.
+pub fn import_from_multipath(config_dir: &std::path::Path) {
     let Some(old_dir) = config_dir.parent().map(|p| p.join(MULTIPATH_DIR)) else {
         return;
     };
@@ -133,7 +135,6 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config_dir: PathBuf) -> AppState {
-        import_from_multipath(&config_dir);
         let settings_path = config_dir.join("settings.json");
         let usage_path = config_dir.join("usage.json");
         let settings = Settings::load(&settings_path);

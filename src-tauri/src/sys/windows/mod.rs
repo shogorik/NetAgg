@@ -2,6 +2,7 @@
 
 mod adapters;
 mod clock;
+mod data_dir;
 mod dns_guard;
 mod elevation;
 mod icmp;
@@ -17,6 +18,7 @@ mod wcm;
 
 pub use adapters::{has_connector, link_dns_servers};
 pub use clock::local_date;
+pub use data_dir::prepare_data_dir;
 pub use dns_guard::DnsGuard;
 pub use elevation::{can_elevate, elevates_in_place, is_elevated, relaunch_elevated, run_elevated};
 pub use icmp::{icmp_echo, icmp_hop};
