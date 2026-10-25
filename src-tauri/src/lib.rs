@@ -85,7 +85,10 @@ pub fn run() {
                 engine::clean_up_stale();
             }
             let state = AppState::new(app.path().app_config_dir()?, autostart::is_enabled());
-            let can_start = elevated || sys::elevates_in_place();
+            // NetAgg comes back the way it was left. Without the rights to turn
+            // on, `switch` relaunches it with them (UAC), as the toggle does;
+            // a copy that was already relaunched for them doesn't try again.
+            let can_start = elevated || sys::elevates_in_place() || !relaunched;
             let start = can_start && (turn_on || state.settings().on);
             state.apply_default_route();
             app.manage(state);
