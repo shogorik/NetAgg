@@ -26,14 +26,19 @@ const SHOW_EVENT_NAME: &str = "Local\\NetAgg.Show";
 /// low integrity processes (browser renderers) can't take or signal them.
 const OPEN_TO_ALL_SDDL: &str = "D:(A;;GA;;;WD)S:(ML;;NW;;;ME)";
 
-struct Security {
+/// Security attributes for a named object, from an SDDL string.
+pub(super) struct Security {
     descriptor: PSECURITY_DESCRIPTOR,
-    attributes: SECURITY_ATTRIBUTES,
+    pub(super) attributes: SECURITY_ATTRIBUTES,
 }
 
 impl Security {
     fn open_to_all() -> io::Result<Security> {
-        let sddl = wide(OPEN_TO_ALL_SDDL);
+        Self::new(OPEN_TO_ALL_SDDL)
+    }
+
+    pub(super) fn new(sddl: &str) -> io::Result<Security> {
+        let sddl = wide(sddl);
         let mut descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
         let ok = unsafe {
             ConvertStringSecurityDescriptorToSecurityDescriptorW(

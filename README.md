@@ -37,9 +37,11 @@ malicious behaviour; the changes close privacy gaps and add control:
 - **Phones are never the default by accident (Windows).** Windows tends to route everything through a USB-tethered
   phone (and its mobile data). NetAgg keeps Windows' default route off the phone while another network is up, or on
   the network you pick. Phones show as *Phone (USB tethering)*, and every network can be renamed.
-- **Hardening:** no swappable temp file behind the elevated *Start with Windows* task, single-instance objects
-  sandboxed processes can't touch, a strict Content Security Policy, and updates signed with NetAgg's own key
-  from this repository.
+- **Privilege separation (Windows).** The engine runs in a small Windows service; the tray app and its web view run
+  without administrator rights. The service only answers NetAgg's own installed executable, keeps its settings where
+  only administrators can change them, and changing DNS settings needs administrator approval (UAC).
+- **Hardening:** single-instance objects sandboxed processes can't touch, a strict Content Security Policy, and
+  updates signed with NetAgg's own key from this repository.
 
 ## Screenshots
 
@@ -133,8 +135,8 @@ proportionally more.
   (on by default) answers every app's lookups with them and, on Windows, blocks port 53 anywhere but through NetAgg.
 - **Default network (Windows):** Settings → Networks picks the network Windows itself routes through, which matters
   while NetAgg is off and for traffic it doesn't carry. Automatic never picks a USB-tethered phone while another network
-  is up; or choose one yourself. NetAgg sets that network's interface metric to 2 (active store only, so a reboot
-  undoes it until NetAgg runs again with administrator rights) and gives it back to Windows when you switch to
+  is up; or choose one yourself. NetAgg sets that network's interface metric to 2 (active store only; the NetAgg
+  service sets it again at boot) and gives it back to Windows when you switch to
   Automatic or another network. Networks can be renamed there too; a phone shows as "Phone (USB tethering)".
 - **Turning NetAgg off** removes everything it added, so your system goes back to normal. (The default
   network choice stays in effect until reboot, so the phone doesn't take over your traffic.)
@@ -146,7 +148,8 @@ Everything is on the [latest release](https://github.com/shogorik/NetAgg-Hardene
 ### Windows
 
 1. Run `NetAgg_<version>_x64-setup.exe`.
-2. Click the NetAgg icon in the tray and turn it on. Windows asks for administrator permission once.
+2. Click the NetAgg icon in the tray and turn it on. The installer set up the NetAgg service, which does the
+   networking, so there's no permission prompt; changing DNS settings asks for administrator approval.
 
 ### Linux
 
@@ -197,7 +200,8 @@ start* (off by default) only looks and tells you; it never installs on its own. 
 `latest.json`. Coming from MultiPath, install NetAgg by hand once: it has its
 own signing key and update feed, and takes over MultiPath's settings on its first start.
 
-- **Windows:** the installer runs; NetAgg turns off first and comes back from the tray. Turn it on again (UAC).
+- **Windows:** the installer runs (administrator approval) and restarts the NetAgg service, which turns back on if
+  it was on.
 - **Linux:** the `.deb` asks for your password to install; an AppImage replaces itself if its folder is writable.
 - **macOS:** NetAgg in Applications replaces itself. If it was on, macOS asks for your password again.
 
@@ -217,7 +221,7 @@ own signing key and update feed, and takes over MultiPath's settings on its firs
 git clone https://github.com/shogorik/NetAgg.git
 cd NetAgg
 npm install
-npm run tauri dev       # opens the app; run it as administrator or root, or accept the permission prompt
+npm run tauri dev       # opens the app. Windows: run the service yourself first (see CLAUDE.md); Linux: accept the prompt
 ```
 
 **Build the packages:**

@@ -56,7 +56,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "toggle" => {
                 let app = app.clone();
                 tauri::async_runtime::spawn(async move {
-                    let on = !app.state::<super::state::AppState>().is_on();
+                    let on = !is_active(&app);
                     if let Err(err) = commands::switch(&app, on).await {
                         log::warn!("{err}");
                     }
@@ -81,6 +81,13 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         })
         .build(app)?;
     Ok(())
+}
+
+/// Whether the icon shows NetAgg on.
+fn is_active(app: &AppHandle) -> bool {
+    let state = app.state::<TrayState>();
+    let shown = state.shown.lock().unwrap();
+    shown.as_ref().is_some_and(|(active, _)| *active)
 }
 
 /// Shows whether NetAgg is combining networks, in the icon, its tooltip

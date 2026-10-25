@@ -1,11 +1,14 @@
 //! Once a second: turn byte counters into rates, count today's data, keep
-//! the network list fresh, and tell the popup and the tray.
+//! the network list fresh (where the engine runs: `Ticks`), and tell the
+//! popup and the tray.
 
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
+use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 
+use super::backend::Backend;
 use super::state::AppState;
 use super::{popup, status, tray};
 use crate::net::{health, links::Links};
@@ -16,14 +19,14 @@ const REFRESH_EVERY: u64 = 3;
 const SAVE_USAGE_EVERY: u64 = 30;
 const SHARED_LINE_EVERY: u64 = 60;
 
-/// Sends the current status to the popup, if it's open, and to the tray.
-pub fn publish(app: &AppHandle) {
-    let status = status::build(&app.state::<AppState>());
-    if let Err(err) = tray::set_active(app, status.on, &status::tooltip(&status)) {
+/// Shows a status in the tray and, if it's open, the popup.
+pub fn show(app: &AppHandle, status: &Value) {
+    let on = status["on"] == true;
+    if let Err(err) = tray::set_active(app, on, &status::tooltip(status)) {
         log::warn!("could not update the tray icon: {err}");
     }
     if popup::is_visible(app) {
-        let _ = app.emit_to(popup::LABEL, "status", &status);
+        let _ = app.emit_to(popup::LABEL, "status", status);
     }
 }
 
@@ -84,16 +87,21 @@ impl Ticks {
 }
 
 pub fn spawn(app: AppHandle) {
-    let state = app.state::<AppState>();
-    tauri::async_runtime::spawn(health::run(state.links.clone(), state.health_stop()));
+    let local = app.state::<Backend>().local().cloned();
+    if let Some(state) = &local {
+        tauri::async_runtime::spawn(health::run(state.links.clone(), state.health_stop()));
+    }
 
     tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(1));
-        let mut ticks = Ticks::new(&app.state::<AppState>());
+        let mut ticks = local.as_deref().map(Ticks::new);
         loop {
             interval.tick().await;
-            ticks.tick(&app.state::<AppState>()).await;
-            publish(&app);
+            if let (Some(ticks), Some(state)) = (&mut ticks, &local) {
+                ticks.tick(state).await;
+            }
+            let status = app.state::<Backend>().status().await;
+            show(&app, &status);
         }
     });
 }

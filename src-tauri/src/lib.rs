@@ -6,15 +6,25 @@ mod sys;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use tauri::{Manager, RunEvent, WindowEvent};
+use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 
-use app::state::AppState;
+use app::backend::Backend;
+use app::control::{OptionChange, Request};
 use app::{autostart, commands, headless, logfile, popup, ticker, tray};
 
 pub fn run() {
     let has_arg = |arg: &str| std::env::args().any(|a| a == arg);
     if has_arg(headless::HEADLESS_ARG) {
         std::process::exit(headless::run());
+    }
+    #[cfg(windows)]
+    if has_arg(app::service::SERVICE_ARG) {
+        std::process::exit(app::service::run());
+    }
+    #[cfg(windows)]
+    if has_arg(app::service::ADMIN_REQUEST_ARG) {
+        let args: Vec<String> = std::env::args().collect();
+        std::process::exit(app::service::run_admin_request(&args));
     }
     #[cfg(target_os = "macos")]
     if has_arg(engine::HELPER_ARG) {
@@ -70,7 +80,6 @@ pub fn run() {
             commands::allow_simultaneous_connections,
             commands::set_option,
             commands::list_connections,
-            commands::prepare_update_install,
         ])
         .setup(move |app| {
             // A menu bar app: no Dock icon, no app menu.
@@ -85,27 +94,41 @@ pub fn run() {
                 env!("CARGO_PKG_VERSION"),
                 std::env::current_exe().ok()
             );
-            if elevated {
-                engine::clean_up_stale();
-            }
-            let state = AppState::new(app.path().app_config_dir()?, autostart::is_enabled());
-            // NetAgg comes back the way it was left. Without the rights to turn
-            // on, `switch` relaunches it with them (UAC), as the toggle does;
-            // a copy relaunched for them just now that still lacks them doesn't
-            // try again (see `commands::relaunch_info`).
-            let can_start = elevated || sys::elevates_in_place() || !just_relaunched;
-            let start = can_start && (turn_on || state.settings().on);
-            state.apply_default_route();
-            restore_start_on_login(&state);
-            app.manage(state);
+            // Windows: the service runs the engine, and this process never
+            // has administrator rights.
+            #[cfg(windows)]
+            let backend = Backend::Service;
+            #[cfg(not(windows))]
+            let backend = {
+                if elevated {
+                    engine::clean_up_stale();
+                }
+                let state = app::state::AppState::new(app.path().app_config_dir()?);
+                state.apply_default_route();
+                Backend::Local(std::sync::Arc::new(state))
+            };
+            app.manage(backend);
             tray::create(app.handle())?;
             ticker::spawn(app.handle().clone());
-            if start {
-                let handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    let _ = commands::switch(&handle, true).await;
-                });
-            }
+            // NetAgg comes back the way it was left. Without the rights to turn
+            // on, it relaunches with them (pkexec), as the toggle does; a copy
+            // relaunched for them just now that still lacks them doesn't try
+            // again (see `commands::relaunch_info`).
+            let can_start = elevated || sys::elevates_in_place() || !just_relaunched;
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                restore_start_on_login(&handle).await;
+                if can_start {
+                    let request = match turn_on {
+                        true => Request::SetEnabled {
+                            on: true,
+                            remember: true,
+                        },
+                        false => Request::Resume,
+                    };
+                    let _ = commands::ask(&handle, request).await;
+                }
+            });
 
             if let Some(instance) = &instance {
                 let handle = app.handle().clone();
@@ -132,10 +155,19 @@ pub fn run() {
         .expect("error while starting NetAgg")
         .run(|app, event| {
             if let RunEvent::Exit = event {
-                // Give the PC its own routing back before going.
-                let state = app.state::<AppState>();
-                tauri::async_runtime::block_on(state.turn_off(false));
-                state.save_usage();
+                // Give the PC its own routing back before going; "on" is
+                // kept, so the next start turns on again.
+                let backend = app.state::<Backend>();
+                let quit = Request::SetEnabled {
+                    on: false,
+                    remember: false,
+                };
+                if let Err(err) = tauri::async_runtime::block_on(backend.call(quit)) {
+                    log::warn!("couldn't turn off: {err}");
+                }
+                if let Some(state) = backend.local() {
+                    state.save_usage();
+                }
                 // A restart after an update starts the new copy before this
                 // one is gone; it must not find this copy still running.
                 if let Some(instance) = app.try_state::<Mutex<Option<sys::Instance>>>() {
@@ -145,22 +177,29 @@ pub fn run() {
         });
 }
 
-/// Keeps the startup task and the user's wish in step: a task found
-/// registered is remembered, and a remembered one that's gone (a manual
-/// upgrade removes it) is registered again, from a safe install only.
-fn restore_start_on_login(state: &AppState) {
-    use std::sync::atomic::Ordering;
-    let registered = state.start_on_login.load(Ordering::Relaxed);
-    let wanted = state.settings().start_on_login;
+/// Keeps starting at sign-in and the user's wish in step: a registration
+/// found is remembered, and a remembered one that's gone (Windows: versions
+/// before the service registered a scheduled task, which the installer
+/// removes) is registered again.
+async fn restore_start_on_login(app: &AppHandle) {
+    let Ok(status) = app.state::<Backend>().call(Request::Status).await else {
+        return;
+    };
+    let wanted = status["settings"]["startOnLogin"] == true;
+    let registered = autostart::is_enabled();
     if registered && !wanted {
-        state.update_settings(|s| s.start_on_login = true);
-    } else if wanted && !registered && commands::install_secure().is_ok() {
+        let change = OptionChange {
+            start_on_login: Some(true),
+            ..Default::default()
+        };
+        let _ = app
+            .state::<Backend>()
+            .call(Request::SetOption { change })
+            .await;
+    } else if wanted && !registered {
         match autostart::set_enabled(true) {
-            Ok(()) => {
-                state.start_on_login.store(true, Ordering::Relaxed);
-                log::info!("registered the startup task again");
-            }
-            Err(err) => log::warn!("couldn't register the startup task again: {err}"),
+            Ok(()) => log::info!("registered starting at sign-in again"),
+            Err(err) => log::warn!("couldn't register starting at sign-in again: {err}"),
         }
     }
 }

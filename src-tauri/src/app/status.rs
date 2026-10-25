@@ -5,7 +5,9 @@ use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use serde::Serialize;
+use serde_json::Value;
 
+use super::settings::Settings;
 use super::state::AppState;
 use crate::engine::{TUN_V4, TUN_V6};
 use crate::net::dns::DnsMode;
@@ -253,18 +255,45 @@ pub fn build(state: &AppState) -> Status {
         today_bytes: state.usage.lock().unwrap().today(sys::local_date()),
         drops_wifi,
         links,
-        settings: SettingsStatus {
-            adaptive: settings.adaptive,
-            sticky: settings.sticky,
-            capture_ipv6: settings.capture_ipv6,
-            dns_mode: settings.dns_mode,
-            dns: settings.dns.clone(),
-            enforce_dns: settings.enforce_dns,
-            start_on_login: state.start_on_login.load(Ordering::Relaxed),
-            check_updates: settings.check_updates,
-            hide_unavailable: settings.hide_unavailable,
-            default_link: settings.default_link.clone(),
-        },
+        settings: settings_status(&settings),
+    }
+}
+
+fn settings_status(settings: &Settings) -> SettingsStatus {
+    SettingsStatus {
+        adaptive: settings.adaptive,
+        sticky: settings.sticky,
+        capture_ipv6: settings.capture_ipv6,
+        dns_mode: settings.dns_mode,
+        dns: settings.dns.clone(),
+        enforce_dns: settings.enforce_dns,
+        start_on_login: settings.start_on_login,
+        check_updates: settings.check_updates,
+        hide_unavailable: settings.hide_unavailable,
+        default_link: settings.default_link.clone(),
+    }
+}
+
+/// What the popup shows when the engine can't be asked (Windows: the
+/// service isn't running), with the reason as the error.
+pub fn offline(error: String) -> Status {
+    Status {
+        platform: std::env::consts::OS,
+        version: env!("CARGO_PKG_VERSION"),
+        on: false,
+        busy: false,
+        // Not the missing-rights note: the error says what's wrong.
+        elevated: true,
+        can_elevate: sys::can_elevate(),
+        error: Some(error),
+        ipv6: false,
+        rx_rate: 0,
+        tx_rate: 0,
+        connections: 0,
+        today_bytes: 0,
+        links: Vec::new(),
+        settings: settings_status(&Settings::default()),
+        drops_wifi: false,
     }
 }
 
@@ -286,16 +315,18 @@ fn drops_wifi(links: &[LinkStatus]) -> bool {
     }
 }
 
-/// The text shown when hovering over the tray icon.
-pub fn tooltip(status: &Status) -> String {
-    if !status.on {
+/// The text shown when hovering over the tray icon, from a status as sent
+/// to the popup.
+pub fn tooltip(status: &Value) -> String {
+    if status["on"] != true {
         return "NetAgg — off".into();
     }
-    let combining = status
-        .links
-        .iter()
-        .filter(|l| l.present && l.enabled && l.health != "down")
-        .count();
+    let combining = status["links"].as_array().map_or(0, |links| {
+        links
+            .iter()
+            .filter(|l| l["present"] == true && l["enabled"] == true && l["health"] != "down")
+            .count()
+    });
     match combining {
         1 => "NetAgg — on, 1 network".into(),
         n => format!("NetAgg — combining {n} networks"),

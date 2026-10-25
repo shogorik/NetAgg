@@ -68,7 +68,7 @@ mod tests {
             "{}",
             std::fs::read_to_string(new.join("settings.json")).unwrap()
         );
-        let state = AppState::new(new.clone(), false);
+        let state = AppState::new(new.clone());
         println!("loaded dns mode: {:?}", state.settings().dns_mode);
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -122,7 +122,6 @@ pub struct AppState {
     pub busy: AtomicBool,
     /// Why NetAgg last failed to turn on, or stopped by itself.
     pub error: Mutex<Option<String>>,
-    pub start_on_login: AtomicBool,
     pub flow_counts: Mutex<FlowCounts>,
     /// The interface last made the default route (0: none), so it's only
     /// changed when the choice changes. Starts unknown, so the first call
@@ -133,7 +132,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(config_dir: PathBuf, start_on_login: bool) -> AppState {
+    pub fn new(config_dir: PathBuf) -> AppState {
         import_from_multipath(&config_dir);
         let settings_path = config_dir.join("settings.json");
         let usage_path = config_dir.join("usage.json");
@@ -162,7 +161,6 @@ impl AppState {
             flows: RwLock::new(None),
             busy: AtomicBool::new(false),
             error: Mutex::new(None),
-            start_on_login: AtomicBool::new(start_on_login),
             flow_counts: Mutex::new(FlowCounts::default()),
             default_applied: AtomicU32::new(u32::MAX),
             health_stop: watch::channel(false).0,
@@ -335,8 +333,12 @@ impl AppState {
     }
 
     /// Applies settings the engine only reads at start (DNS).
+    /// Goes by "on" as saved, not the running engine: a change that arrives
+    /// while an earlier one's start is still under way must restart it too,
+    /// or the engine keeps the earlier settings. `turn_off` waits for that
+    /// start to finish.
     pub async fn restart(&self) -> Result<(), String> {
-        if !self.is_on() {
+        if !self.settings().on {
             return Ok(());
         }
         self.turn_off(false).await;

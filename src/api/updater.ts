@@ -1,6 +1,5 @@
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent } from "@tauri-apps/plugin-updater";
-import { prepareUpdateInstall } from "./commands";
 
 /** Where people can always get NetAgg by hand. */
 export const RELEASES_PAGE = "github.com/shogorik/NetAgg/releases";
@@ -60,8 +59,6 @@ export const appUpdater: Updater = {
           },
           { timeout: DOWNLOAD_TIMEOUT_MS },
         );
-        // The Windows installer replaces NetAgg without a normal exit, so the engine stops first.
-        await prepareUpdateInstall();
         await update.install();
       },
       dismiss: () => update.close(),

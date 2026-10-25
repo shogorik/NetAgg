@@ -1,7 +1,7 @@
-//! NetAgg runs as administrator, and "Start with Windows" starts it that way
-//! without asking. If ordinary users can change its folder or files (a
-//! hand-made `D:\Program Files` often lets them), anything running as the
-//! user could swap in its own code and get those rights. This finds that.
+//! NetAgg's service runs as SYSTEM. If ordinary users can change its folder,
+//! files or settings (a hand-made `D:\Program Files` often lets them),
+//! anything running as the user could swap in its own code, or its own DNS
+//! servers, and get those rights. This finds that.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -41,12 +41,12 @@ fn guarded_paths() -> io::Result<Vec<PathBuf>> {
         .ok_or_else(|| io::Error::other("NetAgg's folder is unknown"))?
         .to_path_buf();
     let resources = dir.join("resources");
-    Ok(vec![
-        dir,
-        exe,
-        resources.clone(),
-        resources.join("wintun.dll"),
-    ])
+    let mut paths = vec![dir, exe, resources.clone(), resources.join("wintun.dll")];
+    // The service's settings choose its DNS servers.
+    if let Some(data) = super::service_data_dir() {
+        paths.extend([data.join("settings.json"), data.join("usage.json"), data]);
+    }
+    Ok(paths)
 }
 
 /// `Err` naming the first file or folder that users who aren't
@@ -109,7 +109,9 @@ fn is_ordinary(sid: PSID, user: &[u8]) -> bool {
         ]
         .iter()
         .any(|&kind| IsWellKnownSid(sid, kind) != 0)
-            || EqualSid(sid, user.as_ptr() as PSID) != 0
+            // The service runs as SYSTEM, which is no ordinary user.
+            || (EqualSid(sid, user.as_ptr() as PSID) != 0
+                && IsWellKnownSid(sid, WinLocalSystemSid) == 0)
     }
 }
 
@@ -210,5 +212,15 @@ mod tests {
         let system32 = PathBuf::from(std::env::var("SystemRoot").unwrap()).join("System32");
         assert!(!changeable_by_users(&system32, &user.0).unwrap());
         assert!(!changeable_by_users(&system32.join("kernel32.dll"), &user.0).unwrap());
+    }
+
+    /// The service checks as SYSTEM, which may change System32 (and the
+    /// install folder): that mustn't count as ordinary users changing it.
+    #[test]
+    fn running_as_system_is_not_an_ordinary_user() {
+        let system: [u8; 12] = [1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0];
+        let system32 = PathBuf::from(std::env::var("SystemRoot").unwrap()).join("System32");
+        assert!(!changeable_by_users(&system32, &system).unwrap());
+        assert!(changeable_by_users(&std::env::temp_dir(), &system).unwrap());
     }
 }

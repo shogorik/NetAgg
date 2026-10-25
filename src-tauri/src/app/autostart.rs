@@ -5,186 +5,44 @@ pub use desktop_entry::{is_enabled, set_enabled};
 #[cfg(target_os = "macos")]
 pub use launch_agent::{is_enabled, set_enabled};
 #[cfg(windows)]
-pub use scheduled_task::{is_enabled, set_enabled};
+pub use run_key::{is_enabled, set_enabled};
 
 /// Tells NetAgg it was started at sign-in, so it stays in the tray.
 pub const AUTOSTART_ARG: &str = "--autostart";
 
-/// NetAgg needs administrator rights, which a Run key can't give without
-/// a UAC prompt at every sign-in, so it registers a scheduled task that runs
-/// with highest privileges instead.
+/// The tray app runs as the user (the service has the rights), so the
+/// user's own Run key starts it, with no prompt.
 #[cfg(windows)]
-mod scheduled_task {
+mod run_key {
     use std::io;
-    use std::os::windows::process::CommandExt;
-    use std::path::Path;
-    use std::process::Command;
 
     use super::AUTOSTART_ARG;
     use crate::sys;
 
-    const TASK_NAME: &str = "NetAgg";
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    const VALUE: &str = "NetAgg";
 
     pub fn is_enabled() -> bool {
-        Command::new("schtasks")
-            .args(["/Query", "/TN", TASK_NAME])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .is_ok_and(|out| out.status.success())
+        sys::has_run_value(VALUE)
     }
 
-    /// Registers or removes the task. Shows a UAC prompt unless NetAgg is
-    /// already running as administrator.
     pub fn set_enabled(enabled: bool) -> io::Result<()> {
-        let code = if enabled {
-            let exe = std::env::current_exe()?;
-            let user = match (std::env::var("USERDOMAIN"), std::env::var("USERNAME")) {
-                (Ok(domain), Ok(name)) => format!("{domain}\\{name}"),
-                _ => return Err(io::Error::other("could not tell who is signed in")),
-            };
-            let xml_path = std::env::temp_dir().join(format!(
-                "netagg-task-{}-{}.xml",
-                std::process::id(),
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map_or(0, |d| d.as_nanos())
-            ));
-            // %TEMP% is writable by everything the user runs. Held open, read
-            // back and shared for reading only, the file can't be swapped or
-            // changed before the elevated schtasks reads it, so nothing else
-            // gets its own task registered with highest rights.
-            let held = write_utf16(&xml_path, &task_xml(&exe.to_string_lossy(), &user))?;
-            let args = format!("/Create /TN {TASK_NAME} /XML \"{}\" /F", xml_path.display());
-            let code = sys::run_elevated("schtasks", &args);
-            drop(held);
-            let _ = std::fs::remove_file(&xml_path);
-            code?
-        } else {
-            sys::run_elevated("schtasks", &format!("/Delete /TN {TASK_NAME} /F"))?
-        };
-        if code == 0 {
-            Ok(())
-        } else {
-            Err(io::Error::other(format!(
-                "schtasks failed with code {code}"
-            )))
-        }
+        let exe = std::env::current_exe()?;
+        let command = command_line(&exe.to_string_lossy());
+        sys::set_run_value(VALUE, enabled.then_some(command.as_str()))
     }
 
-    /// `schtasks /XML` reads UTF-16 with a byte order mark most reliably.
-    /// Only creates a new file (never one planted at that name), then
-    /// returns it reopened for reading, shared for reading only, once it's
-    /// checked to still hold `text`. A handle that can write would make
-    /// schtasks fail to open it ("used by another process").
-    fn write_utf16(path: &Path, text: &str) -> io::Result<std::fs::File> {
-        use std::io::{Read, Write};
-        use std::os::windows::fs::OpenOptionsExt;
-        const FILE_SHARE_READ: u32 = 1;
-        let bytes: Vec<u8> = std::iter::once(0xfeff)
-            .chain(text.encode_utf16())
-            .flat_map(u16::to_le_bytes)
-            .collect();
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .share_mode(FILE_SHARE_READ)
-            .open(path)?;
-        file.write_all(&bytes)?;
-        drop(file);
-        let mut held = std::fs::OpenOptions::new()
-            .read(true)
-            .share_mode(FILE_SHARE_READ)
-            .open(path)?;
-        let mut written = Vec::new();
-        held.read_to_end(&mut written)?;
-        if written != bytes {
-            return Err(io::Error::other("the task file was changed"));
-        }
-        Ok(held)
-    }
-
-    fn escape(s: &str) -> String {
-        s.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-    }
-
-    /// Runs at sign-in, elevated without a prompt, on battery too, with no time limit.
-    fn task_xml(exe: &str, user: &str) -> String {
-        let (exe, user) = (escape(exe), escape(user));
-        format!(
-            r#"<?xml version="1.0" encoding="UTF-16"?>
-<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo>
-    <Description>Starts NetAgg when you sign in.</Description>
-  </RegistrationInfo>
-  <Triggers>
-    <LogonTrigger>
-      <Enabled>true</Enabled>
-      <UserId>{user}</UserId>
-    </LogonTrigger>
-  </Triggers>
-  <Principals>
-    <Principal id="Author">
-      <UserId>{user}</UserId>
-      <LogonType>InteractiveToken</LogonType>
-      <RunLevel>HighestAvailable</RunLevel>
-    </Principal>
-  </Principals>
-  <Settings>
-    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
-    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
-    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
-    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
-    <Priority>5</Priority>
-  </Settings>
-  <Actions Context="Author">
-    <Exec>
-      <Command>{exe}</Command>
-      <Arguments>{AUTOSTART_ARG}</Arguments>
-    </Exec>
-  </Actions>
-</Task>
-"#
-        )
+    fn command_line(exe: &str) -> String {
+        format!("\"{exe}\" {AUTOSTART_ARG}")
     }
 
     #[cfg(test)]
     mod tests {
-        use super::*;
-
         #[test]
-        fn task_file_is_new_and_locked_while_held() {
-            let path =
-                std::env::temp_dir().join(format!("mp-task-test-{}.xml", std::process::id()));
-            let _ = std::fs::remove_file(&path);
-            let held = write_utf16(&path, "<Task/>").unwrap();
-            // Readable (schtasks), but not writable, deletable or replaceable.
-            assert!(std::fs::read(&path).unwrap().starts_with(&[0xff, 0xfe]));
-            assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
-            assert!(std::fs::remove_file(&path).is_err());
-            assert!(write_utf16(&path, "x").is_err());
-            // schtasks opens it to read, sharing only reading: that must work.
-            use std::os::windows::fs::OpenOptionsExt;
-            std::fs::OpenOptions::new()
-                .read(true)
-                .share_mode(1)
-                .open(&path)
-                .expect("a reader that shares only reading can open it");
-            drop(held);
-            std::fs::remove_file(&path).unwrap();
-        }
-
-        #[test]
-        fn task_runs_the_app_elevated_at_sign_in() {
-            let xml = task_xml(r"C:\Program Files\A&B\netagg.exe", r"PC\me");
-            assert!(xml.contains(r"<Command>C:\Program Files\A&amp;B\netagg.exe</Command>"));
-            assert!(xml.contains("<Arguments>--autostart</Arguments>"));
-            assert!(xml.contains("<RunLevel>HighestAvailable</RunLevel>"));
-            assert!(xml.contains(r"<UserId>PC\me</UserId>"));
-            assert!(xml.contains("<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>"));
+        fn quotes_the_path() {
+            assert_eq!(
+                super::command_line(r"D:\Program Files\NetAgg\netagg.exe"),
+                r#""D:\Program Files\NetAgg\netagg.exe" --autostart"#
+            );
         }
     }
 }
