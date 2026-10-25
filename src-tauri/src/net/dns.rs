@@ -157,11 +157,42 @@ impl Upstream {
 }
 
 /// Idle encrypted connections, by network and server index.
-type Pool = HashMap<(String, usize), Vec<(Instant, Conn)>>;
+type Pool<T = Conn> = HashMap<(String, usize), Vec<(Instant, T)>>;
 
 enum Conn {
     Tls(Box<TlsStream<TcpStream>>),
     Https(SendRequest<Full<Bytes>>),
+}
+
+impl Conn {
+    /// False once the server has closed it, where that can be seen.
+    fn open(&self) -> bool {
+        match self {
+            Conn::Tls(_) => true,
+            Conn::Https(sender) => !sender.is_closed(),
+        }
+    }
+}
+
+/// Drops connections idle past `IDLE` or already closed, and empty entries.
+fn prune<T>(pool: &mut Pool<T>, open: impl Fn(&T) -> bool) {
+    pool.retain(|_, conns| {
+        conns.retain(|(at, conn)| at.elapsed() < IDLE && open(conn));
+        !conns.is_empty()
+    });
+}
+
+/// How often idle connections are looked at, so ones nobody asks for again
+/// are closed too (a server that hung up leaves ours half-open otherwise).
+const SWEEP: Duration = Duration::from_secs(5);
+
+/// Prunes `pool` until the resolver that owns it is gone.
+async fn sweep(pool: std::sync::Weak<Mutex<Pool>>) {
+    loop {
+        tokio::time::sleep(SWEEP).await;
+        let Some(pool) = pool.upgrade() else { return };
+        prune(&mut pool.lock().unwrap(), Conn::open);
+    }
 }
 
 pub struct Resolver {
@@ -171,7 +202,9 @@ pub struct Resolver {
     dot: Option<TlsConnector>,
     doh: Option<TlsConnector>,
     /// Encrypted connections to reuse, by network and server.
-    idle: Mutex<Pool>,
+    idle: Arc<Mutex<Pool>>,
+    /// The sweeper for `idle` has been started.
+    sweeping: std::sync::atomic::AtomicBool,
     link_dns: Mutex<HashMap<u32, (Instant, Vec<SocketAddr>)>>,
 }
 
@@ -198,7 +231,8 @@ impl Resolver {
             upstreams,
             dot,
             doh,
-            idle: Mutex::default(),
+            idle: Arc::default(),
+            sweeping: Default::default(),
             link_dns: Mutex::default(),
         })
     }
@@ -325,12 +359,18 @@ impl Resolver {
 
     fn take(&self, key: &(String, usize)) -> Option<Conn> {
         let mut idle = self.idle.lock().unwrap();
-        let conns = idle.get_mut(key)?;
-        conns.retain(|(at, _)| at.elapsed() < IDLE);
-        conns.pop().map(|(_, conn)| conn)
+        prune(&mut idle, Conn::open);
+        idle.get_mut(key)?.pop().map(|(_, conn)| conn)
     }
 
     fn put(&self, key: (String, usize), conn: Conn) {
+        // Started with the first pooled connection, inside the runtime.
+        if !self
+            .sweeping
+            .swap(true, std::sync::atomic::Ordering::Relaxed)
+        {
+            tokio::spawn(sweep(Arc::downgrade(&self.idle)));
+        }
         let mut idle = self.idle.lock().unwrap();
         let conns = idle.entry(key).or_default();
         if conns.len() < POOL_MAX {
@@ -648,6 +688,22 @@ mod tests {
         assert!(ok("192.168.1.1") && ok("8.8.8.8") && ok("fe80::1") && ok("2001:db8::53"));
         assert!(!ok("127.0.0.53") && !ok("::1") && !ok("10.77.0.53") && !ok("fec0:0:0:ffff::1"));
         assert!(!ok("0.0.0.0"));
+    }
+
+    #[test]
+    fn prune_drops_stale_and_closed_connections() {
+        let now = Instant::now();
+        let old = now - IDLE - Duration::from_secs(1);
+        let mut pool: Pool<bool> = HashMap::new();
+        // (opened at, still open)
+        pool.insert(
+            ("wifi".into(), 0),
+            vec![(now, true), (old, true), (now, false)],
+        );
+        pool.insert(("phone".into(), 0), vec![(old, true)]);
+        prune(&mut pool, |open| *open);
+        assert_eq!(pool.len(), 1, "an entry with nothing left is removed");
+        assert_eq!(pool[&("wifi".to_owned(), 0)].len(), 1);
     }
 
     #[test]
