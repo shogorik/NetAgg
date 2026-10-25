@@ -13,6 +13,9 @@ pub struct LinkPrefs {
     /// Relative share of new connections, 1 to 10.
     pub weight: u32,
     pub label: Option<String>,
+    /// The link's long-term capacity in bytes/s (`LinkStats::capacity`),
+    /// kept so a restart doesn't start the balancer blind.
+    pub capacity: u64,
 }
 
 impl Default for LinkPrefs {
@@ -21,6 +24,7 @@ impl Default for LinkPrefs {
             enabled: true,
             weight: 5,
             label: None,
+            capacity: 0,
         }
     }
 }

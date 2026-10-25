@@ -132,7 +132,8 @@ impl Router {
                 id: &l.id,
                 weight: *weight,
                 busy: l.busy(),
-                peak_rx: l.stats.peak_rx.load(Ordering::Relaxed),
+                peak_rx: l.capacity_estimate(),
+                rank: l.info().rank(),
             })
             .collect();
         let id = balancer::pick(&candidates, policy.adaptive)?;

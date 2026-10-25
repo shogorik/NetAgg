@@ -49,13 +49,17 @@ pub struct Candidate<'a> {
     /// connections (keep-alives, push channels) don't count: they take no
     /// bandwidth, and counting them would hide where the real load is.
     pub busy: u32,
-    /// Recent peak download rate, bytes/s.
+    /// What the link can carry, bytes/s: its recent peak while it's busy,
+    /// otherwise its long-term capacity (`LinkStats::capacity`).
     pub peak_rx: u64,
+    /// Preference when everything else ties (lower first): wired, Wi-Fi,
+    /// other, then metered (a phone's or mobile network's data).
+    pub rank: u8,
 }
 
 /// Below this a link hasn't carried enough traffic for its peak to say
 /// anything about its capacity.
-const MIN_PEAK_FOR_ADAPTIVE: u64 = 256 * 1024;
+pub const MIN_PEAK_FOR_ADAPTIVE: u64 = 256 * 1024;
 
 /// Each link's estimated capacity, in bytes/s. A link's peak only shows
 /// what it carried, not what it could carry, so a link that is idle or
@@ -76,7 +80,7 @@ pub fn capacities(candidates: &[Candidate]) -> Vec<f64> {
         .iter()
         .map(|c| {
             let peak = c.peak_rx as f64;
-            if c.peak_rx < MIN_PEAK_FOR_ADAPTIVE || c.busy == 0 {
+            if c.peak_rx < MIN_PEAK_FOR_ADAPTIVE {
                 peak.max(mean)
             } else {
                 peak
@@ -102,15 +106,18 @@ pub fn pick<'a>(candidates: &[Candidate<'a>], adaptive: bool) -> Option<&'a str>
         .zip(capacity)
         .map(|(c, capacity)| {
             let share = c.weight.max(1) as f64 * capacity;
-            (share / (c.busy as f64 + 1.0), share, c.id)
+            (share / (c.busy as f64 + 1.0), share, c.rank, c.id)
         })
-        // Most room first; on a tie, the bigger share; then a stable order.
+        // Most room first; on a tie, the bigger share, then the better kind
+        // of network (never the phone just because of its id), then a
+        // stable order.
         .max_by(|a, b| {
             a.0.total_cmp(&b.0)
                 .then(a.1.total_cmp(&b.1))
-                .then(b.2.cmp(a.2))
+                .then(b.2.cmp(&a.2))
+                .then(b.3.cmp(a.3))
         })
-        .map(|(_, _, id)| id)
+        .map(|(_, _, _, id)| id)
 }
 
 /// How long a site stays on its link after its last flow opened.
@@ -158,6 +165,7 @@ mod tests {
             weight,
             busy: 0,
             peak_rx: 0,
+            rank: 0,
         }
     }
 
@@ -232,6 +240,29 @@ mod tests {
         assert_eq!(pick(&[wifi.clone(), phone.clone()], true), Some("wifi"));
         let caps = capacities(&[wifi, phone]);
         assert_eq!(caps[0], caps[1]);
+    }
+
+    #[test]
+    fn ties_go_to_the_better_kind_of_network() {
+        // The phone sorts first by id, as its GUID did on a real PC.
+        let mut phone = candidate("a-phone", 5);
+        phone.rank = 3;
+        let mut wifi = candidate("b-wifi", 5);
+        wifi.rank = 1;
+        assert_eq!(pick(&[phone.clone(), wifi.clone()], true), Some("b-wifi"));
+        // Busy flows still spread across both.
+        assert_eq!(distribute(vec![phone, wifi], 4, false), vec![2, 2]);
+    }
+
+    #[test]
+    fn known_capacity_shapes_a_fresh_burst() {
+        // Idle links with long-term capacities: a burst splits by them
+        // from the first flow, not evenly.
+        let mut wifi = candidate("wifi", 5);
+        wifi.peak_rx = 60 * MB;
+        let mut phone = candidate("phone", 5);
+        phone.peak_rx = 20 * MB;
+        assert_eq!(distribute(vec![wifi, phone], 8, true), vec![6, 2]);
     }
 
     #[test]

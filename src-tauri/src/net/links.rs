@@ -74,6 +74,10 @@ pub struct LinkStats {
     /// Highest recent download rate in bytes/s, decaying slowly. Drives
     /// adaptive weighting.
     pub peak_rx: AtomicU64,
+    /// The best download rate the link has shown, bytes/s, fading to half
+    /// in a day: what it can carry, for when it has nothing to show right
+    /// now (idle, or just after a restart). Saved with the settings.
+    pub capacity: AtomicU64,
     /// Flows that were busy at the last tick.
     pub busy: AtomicU32,
     /// Flows opened since the last tick; they're busy until it sees them.
@@ -138,6 +142,18 @@ impl Link {
         self.meters.lock().unwrap().push(Arc::downgrade(&meter));
         self.stats.opened_since_tick.fetch_add(1, Ordering::Relaxed);
         meter
+    }
+
+    /// What the balancer should expect the link to carry: its recent peak
+    /// while it's busy and that peak means something, otherwise the most it
+    /// has shown lately or in the longer run.
+    pub fn capacity_estimate(&self) -> u64 {
+        let peak = self.stats.peak_rx.load(Ordering::Relaxed);
+        if self.busy() > 0 && peak >= super::balancer::MIN_PEAK_FOR_ADAPTIVE {
+            peak
+        } else {
+            peak.max(self.stats.capacity.load(Ordering::Relaxed))
+        }
     }
 
     /// Busy flows right now, for the balancer.
@@ -220,6 +236,17 @@ impl LinkInfo {
     /// A phone's or mobile network's data, usually limited.
     fn metered(&self) -> bool {
         matches!(self.kind, "phone" | "cellular")
+    }
+
+    /// Which link takes a flow when everything else ties: wired, Wi-Fi,
+    /// other, then metered.
+    pub fn rank(&self) -> u8 {
+        match self.kind {
+            "ethernet" => 0,
+            "wifi" => 1,
+            _ if self.metered() => 3,
+            _ => 2,
+        }
     }
 }
 
@@ -476,6 +503,12 @@ impl Links {
             let decayed = peak - peak / 36;
             link.stats
                 .peak_rx
+                .store(decayed.max(r.rx_rate), Ordering::Relaxed);
+            // Half in a day, at one tick a second.
+            let capacity = link.stats.capacity.load(Ordering::Relaxed);
+            let decayed = capacity - capacity / 124_650;
+            link.stats
+                .capacity
                 .store(decayed.max(r.rx_rate), Ordering::Relaxed);
         }
     }

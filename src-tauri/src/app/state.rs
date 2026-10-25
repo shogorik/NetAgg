@@ -146,6 +146,10 @@ impl AppState {
         );
         let links = Arc::new(Links::default());
         links.refresh();
+        for link in links.all() {
+            let saved = settings.link(&link.id).capacity;
+            link.stats.capacity.store(saved, Ordering::Relaxed);
+        }
         let router = Arc::new(Router::new(links.clone(), settings.policy()));
         AppState {
             links,
@@ -187,6 +191,46 @@ impl AppState {
 
     pub fn save_usage(&self) {
         self.usage.lock().unwrap().save(&self.usage_path);
+        self.save_capacities();
+    }
+
+    /// Gives links that know nothing yet (new this run, or just found) the
+    /// capacity saved for them.
+    pub fn restore_capacities(&self) {
+        let settings = self.settings();
+        for link in self.links.all() {
+            let saved = settings.link(&link.id).capacity;
+            if saved > 0 {
+                let _ = link.stats.capacity.compare_exchange(
+                    0,
+                    saved,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                );
+            }
+        }
+    }
+
+    /// Saves the links' capacities when one moved by more than a tenth.
+    fn save_capacities(&self) {
+        let settings = self.settings();
+        let current: Vec<(String, u64)> = self
+            .links
+            .all()
+            .iter()
+            .map(|l| (l.id.clone(), l.stats.capacity.load(Ordering::Relaxed)))
+            .collect();
+        let moved = current.iter().any(|(id, now)| {
+            let saved = settings.link(id).capacity;
+            now.abs_diff(saved) > saved / 10
+        });
+        if moved {
+            self.update_settings(|s| {
+                for (id, now) in current {
+                    s.links.entry(id).or_default().capacity = now;
+                }
+            });
+        }
     }
 
     /// The interface NetAgg made the default route, if it made one.
