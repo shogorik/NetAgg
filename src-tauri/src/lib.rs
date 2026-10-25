@@ -91,6 +91,7 @@ pub fn run() {
             let can_start = elevated || sys::elevates_in_place() || !relaunched;
             let start = can_start && (turn_on || state.settings().on);
             state.apply_default_route();
+            restore_start_on_login(&state);
             app.manage(state);
             tray::create(app.handle())?;
             ticker::spawn(app.handle().clone());
@@ -137,6 +138,26 @@ pub fn run() {
                 }
             }
         });
+}
+
+/// Keeps the startup task and the user's wish in step: a task found
+/// registered is remembered, and a remembered one that's gone (a manual
+/// upgrade removes it) is registered again, from a safe install only.
+fn restore_start_on_login(state: &AppState) {
+    use std::sync::atomic::Ordering;
+    let registered = state.start_on_login.load(Ordering::Relaxed);
+    let wanted = state.settings().start_on_login;
+    if registered && !wanted {
+        state.update_settings(|s| s.start_on_login = true);
+    } else if wanted && !registered && commands::install_secure().is_ok() {
+        match autostart::set_enabled(true) {
+            Ok(()) => {
+                state.start_on_login.store(true, Ordering::Relaxed);
+                log::info!("registered the startup task again");
+            }
+            Err(err) => log::warn!("couldn't register the startup task again: {err}"),
+        }
+    }
 }
 
 #[cfg(test)]

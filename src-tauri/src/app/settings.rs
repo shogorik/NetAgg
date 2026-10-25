@@ -54,6 +54,10 @@ pub struct Settings {
     /// The network the OS should route through by default (a link id), or
     /// automatic: never a phone while another network is up.
     pub default_link: Option<String>,
+    /// The user wants NetAgg started at sign-in. Kept here as well as in
+    /// the task itself: a manual upgrade runs the old uninstaller, which
+    /// removes the task, and this puts it back.
+    pub start_on_login: bool,
 }
 
 impl Default for Settings {
@@ -72,6 +76,7 @@ impl Default for Settings {
             check_updates: false,
             hide_unavailable: false,
             default_link: None,
+            start_on_login: false,
         }
     }
 }

@@ -177,6 +177,7 @@ pub async fn set_option(app: AppHandle, change: OptionChange) -> Result<Status, 
             .map_err(|e| e.to_string())?
             .map_err(|e| format!("Couldn't change starting at sign-in: {e}"))?;
         state.start_on_login.store(enabled, Ordering::Relaxed);
+        state.update_settings(|s| s.start_on_login = enabled);
     }
 
     let before = state.settings();
