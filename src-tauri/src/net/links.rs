@@ -75,7 +75,7 @@ pub struct LinkStats {
     /// adaptive weighting.
     pub peak_rx: AtomicU64,
     /// The best download rate the link has shown, bytes/s, fading to half
-    /// in a day: what it can carry, for when it has nothing to show right
+    /// in an hour (so a network that really slowed down is noticed): what it can carry, for when it has nothing to show right
     /// now (idle, or just after a restart). Saved with the settings.
     pub capacity: AtomicU64,
     /// Flows that were busy at the last tick.
@@ -144,16 +144,14 @@ impl Link {
         meter
     }
 
-    /// What the balancer should expect the link to carry: its recent peak
-    /// while it's busy and that peak means something, otherwise the most it
-    /// has shown lately or in the longer run.
+    /// What the balancer should expect the link to carry: the most it has
+    /// shown, lately or over the last hour or so. Not the recent peak alone
+    /// while it's busy: at the start of a burst its first flows are still
+    /// ramping up, and their low rate would send the next flows to a slower
+    /// network that happens to be idle.
     pub fn capacity_estimate(&self) -> u64 {
         let peak = self.stats.peak_rx.load(Ordering::Relaxed);
-        if self.busy() > 0 && peak >= super::balancer::MIN_PEAK_FOR_ADAPTIVE {
-            peak
-        } else {
-            peak.max(self.stats.capacity.load(Ordering::Relaxed))
-        }
+        peak.max(self.stats.capacity.load(Ordering::Relaxed))
     }
 
     /// Busy flows right now, for the balancer.
@@ -504,9 +502,9 @@ impl Links {
             link.stats
                 .peak_rx
                 .store(decayed.max(r.rx_rate), Ordering::Relaxed);
-            // Half in a day, at one tick a second.
+            // Half in an hour, at one tick a second.
             let capacity = link.stats.capacity.load(Ordering::Relaxed);
-            let decayed = capacity - capacity / 124_650;
+            let decayed = capacity - capacity / 5_194;
             link.stats
                 .capacity
                 .store(decayed.max(r.rx_rate), Ordering::Relaxed);
@@ -534,6 +532,21 @@ mod tests {
             present,
             ..test_info()
         }
+    }
+
+    #[test]
+    fn a_ramping_link_keeps_its_known_capacity() {
+        // Wi-Fi has shown 60 MB/s; its first flow of a new burst is busy
+        // but has only reached 5 MB/s so far.
+        let wifi = Link::new("wifi".into(), test_info());
+        wifi.stats.capacity.store(60 << 20, Ordering::Relaxed);
+        wifi.stats.peak_rx.store(5 << 20, Ordering::Relaxed);
+        let _flow = wifi.meter();
+        assert!(wifi.busy() > 0);
+        assert_eq!(wifi.capacity_estimate(), 60 << 20);
+        // A faster recent peak still counts in full.
+        wifi.stats.peak_rx.store(80 << 20, Ordering::Relaxed);
+        assert_eq!(wifi.capacity_estimate(), 80 << 20);
     }
 
     #[test]
