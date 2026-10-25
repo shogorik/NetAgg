@@ -50,10 +50,10 @@ mod scheduled_task {
                     .duration_since(std::time::UNIX_EPOCH)
                     .map_or(0, |d| d.as_nanos())
             ));
-            // %TEMP% is writable by everything the user runs. Held open with
-            // read-only sharing, the file can't be swapped or changed between
-            // writing it and the elevated schtasks reading it, so nothing
-            // else gets its own task registered with highest rights.
+            // %TEMP% is writable by everything the user runs. Held open, read
+            // back and shared for reading only, the file can't be swapped or
+            // changed before the elevated schtasks reads it, so nothing else
+            // gets its own task registered with highest rights.
             let held = write_utf16(&xml_path, &task_xml(&exe.to_string_lossy(), &user))?;
             let args = format!("/Create /TN {TASK_NAME} /XML \"{}\" /F", xml_path.display());
             let code = sys::run_elevated("schtasks", &args);
@@ -73,10 +73,12 @@ mod scheduled_task {
     }
 
     /// `schtasks /XML` reads UTF-16 with a byte order mark most reliably.
-    /// Only creates a new file (never one planted at that name) and returns
-    /// it still open, shared for reading only.
+    /// Only creates a new file (never one planted at that name), then
+    /// returns it reopened for reading, shared for reading only, once it's
+    /// checked to still hold `text`. A handle that can write would make
+    /// schtasks fail to open it ("used by another process").
     fn write_utf16(path: &Path, text: &str) -> io::Result<std::fs::File> {
-        use std::io::Write;
+        use std::io::{Read, Write};
         use std::os::windows::fs::OpenOptionsExt;
         const FILE_SHARE_READ: u32 = 1;
         let bytes: Vec<u8> = std::iter::once(0xfeff)
@@ -89,8 +91,17 @@ mod scheduled_task {
             .share_mode(FILE_SHARE_READ)
             .open(path)?;
         file.write_all(&bytes)?;
-        file.flush()?;
-        Ok(file)
+        drop(file);
+        let mut held = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(FILE_SHARE_READ)
+            .open(path)?;
+        let mut written = Vec::new();
+        held.read_to_end(&mut written)?;
+        if written != bytes {
+            return Err(io::Error::other("the task file was changed"));
+        }
+        Ok(held)
     }
 
     fn escape(s: &str) -> String {
@@ -155,6 +166,13 @@ mod scheduled_task {
             assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
             assert!(std::fs::remove_file(&path).is_err());
             assert!(write_utf16(&path, "x").is_err());
+            // schtasks opens it to read, sharing only reading: that must work.
+            use std::os::windows::fs::OpenOptionsExt;
+            std::fs::OpenOptions::new()
+                .read(true)
+                .share_mode(1)
+                .open(&path)
+                .expect("a reader that shares only reading can open it");
             drop(held);
             std::fs::remove_file(&path).unwrap();
         }
