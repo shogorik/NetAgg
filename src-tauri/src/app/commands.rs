@@ -24,6 +24,14 @@ pub const TURN_ON_ARG: &str = "--turn-on";
 /// copy exits. macOS asks for the password as it turns on instead.
 pub async fn switch(app: &AppHandle, on: bool) -> Result<(), String> {
     let state = app.state::<AppState>();
+    if on {
+        if let Err(err) = install_secure() {
+            // Also shown when it was the start at sign-in that tried.
+            *state.error.lock().unwrap() = Some(err.clone());
+            ticker::publish(app);
+            return Err(err);
+        }
+    }
     let result = if !on {
         state.turn_off(true).await;
         Ok(())
@@ -37,6 +45,21 @@ pub async fn switch(app: &AppHandle, on: bool) -> Result<(), String> {
     };
     ticker::publish(app);
     result
+}
+
+/// Refuses to run with administrator rights from a folder other programs
+/// could change (Windows). Debug builds run from the source tree, so they
+/// only warn.
+pub fn install_secure() -> Result<(), String> {
+    #[cfg(windows)]
+    if let Err(err) = sys::check_install_secure() {
+        if cfg!(debug_assertions) {
+            log::warn!("{err}");
+        } else {
+            return Err(err.to_string());
+        }
+    }
+    Ok(())
 }
 
 fn current(app: &AppHandle) -> Status {
@@ -145,6 +168,10 @@ pub async fn set_option(app: AppHandle, change: OptionChange) -> Result<Status, 
     let state = app.state::<AppState>();
     let dns = change.dns.as_deref().map(parse_dns).transpose()?;
     if let Some(enabled) = change.start_on_login {
+        // The startup task runs NetAgg elevated without asking.
+        if enabled {
+            install_secure()?;
+        }
         tauri::async_runtime::spawn_blocking(move || autostart::set_enabled(enabled))
             .await
             .map_err(|e| e.to_string())?

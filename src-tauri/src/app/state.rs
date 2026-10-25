@@ -47,6 +47,32 @@ fn import_from_multipath(config_dir: &std::path::Path) {
 mod tests {
     use super::*;
 
+    /// Imports this machine's real MultiPath settings into a temporary
+    /// folder. Run with `cargo test real_import -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn real_import() {
+        let appdata = std::path::PathBuf::from(std::env::var("APPDATA").unwrap());
+        let root = std::env::temp_dir().join(format!("netagg-real-{}", std::process::id()));
+        std::fs::create_dir_all(root.join(MULTIPATH_DIR)).unwrap();
+        for file in ["settings.json", "usage.json"] {
+            std::fs::copy(
+                appdata.join(MULTIPATH_DIR).join(file),
+                root.join(MULTIPATH_DIR).join(file),
+            )
+            .unwrap();
+        }
+        let new = root.join("dev.netagg");
+        import_from_multipath(&new);
+        println!(
+            "{}",
+            std::fs::read_to_string(new.join("settings.json")).unwrap()
+        );
+        let state = AppState::new(new.clone(), false);
+        println!("loaded dns mode: {:?}", state.settings().dns_mode);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
     #[test]
     fn imports_multipath_settings_once() {
         let root = std::env::temp_dir().join(format!("netagg-import-{}", std::process::id()));
