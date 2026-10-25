@@ -3,6 +3,17 @@
 export type LinkKind = "wifi" | "ethernet" | "phone" | "cellular" | "other";
 export type Health = "up" | "down" | "unknown";
 
+/** A network's path, stage by stage, in ms (null: no answer). */
+export interface Diagnosis {
+  router: number | null;
+  isp: number | null;
+  ispAddress: string | null;
+  cloudflare: number | null;
+  adguard: number | null;
+  /** Whether the stages have been checked yet. */
+  checked: boolean;
+}
+
 export interface LinkStatus {
   id: string;
   name: string;
@@ -21,6 +32,7 @@ export interface LinkStatus {
   totalBytes: number;
   /** Id of another network whose router this one's path goes through (one internet line). */
   sharesLineWith: string | null;
+  diagnosis: Diagnosis;
   enabled: boolean;
   weight: number;
   /** Bytes per second. */

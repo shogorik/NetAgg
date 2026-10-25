@@ -41,6 +41,19 @@ pub struct Status {
     pub drops_wifi: bool,
 }
 
+/// A link's path, stage by stage, in ms (`None`: no answer).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosisStatus {
+    pub router: Option<u32>,
+    pub isp: Option<u32>,
+    pub isp_address: Option<String>,
+    pub cloudflare: Option<u32>,
+    pub adguard: Option<u32>,
+    /// Whether the stages have been checked yet.
+    pub checked: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkStatus {
@@ -66,6 +79,7 @@ pub struct LinkStatus {
     pub total_bytes: u64,
     /// Id of another network whose router this one's path goes through.
     pub shares_line_with: Option<String>,
+    pub diagnosis: DiagnosisStatus,
     pub enabled: bool,
     pub weight: u32,
     pub rx_rate: u64,
@@ -170,6 +184,17 @@ pub fn build(state: &AppState) -> Status {
                 name: prefs.label.clone().unwrap_or_else(|| info.display_name()),
                 os_name: info.name.clone(),
                 shares_line_with: link.shares_line_with.lock().unwrap().clone(),
+                diagnosis: {
+                    let d = link.diagnosis.lock().unwrap().clone();
+                    DiagnosisStatus {
+                        checked: d != Default::default(),
+                        router: d.router,
+                        isp: d.isp,
+                        isp_address: d.isp_address.map(|ip| ip.to_string()),
+                        cloudflare: d.cloudflare,
+                        adguard: d.adguard,
+                    }
+                },
                 total_bytes: link.stats.rx.load(Ordering::Relaxed)
                     + link.stats.tx.load(Ordering::Relaxed),
                 description: info.description,

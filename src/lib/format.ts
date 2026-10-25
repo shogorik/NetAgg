@@ -1,4 +1,4 @@
-import type { LinkKind, LinkStatus } from "../api/types";
+import type { Diagnosis, LinkKind, LinkStatus } from "../api/types";
 
 const UNITS = ["B", "KB", "MB", "GB", "TB"];
 
@@ -123,4 +123,27 @@ export function ringSegments(
     if (share > 0) at += length + (visible > 1 ? gap : 0);
     return segment;
   });
+}
+
+/** Each stage of a network's path with its time: "Router 2 ms · ISP 6 ms · …". */
+export function diagnosisLine(d: Diagnosis): string {
+  const stage = (name: string, ms: number | null) => `${name} ${ms === null ? "—" : `${ms} ms`}`;
+  return [
+    stage("Router", d.router),
+    stage("ISP", d.isp),
+    stage("Cloudflare", d.cloudflare),
+    stage("AdGuard", d.adguard),
+  ].join(" · ");
+}
+
+/**
+ * Where a network without internet stops answering, in plain words; null while it reaches the
+ * internet (or hasn't been checked). The provider stage only narrows things down when the router
+ * answers: some providers don't answer pings at all.
+ */
+export function diagnosisProblem(d: Diagnosis): string | null {
+  if (!d.checked || d.cloudflare !== null || d.adguard !== null) return null;
+  if (d.router === null) return "Its router isn't answering: check the cable, Wi-Fi or phone.";
+  if (d.isp === null) return "The router answers, but its connection to the provider doesn't.";
+  return "Router and provider answer, but the internet beyond them doesn't.";
 }

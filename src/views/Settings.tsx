@@ -13,7 +13,7 @@ import { hidePopup } from "../api/window";
 import { SubHeader } from "../components/Header";
 import { Toggle } from "../components/Toggle";
 import { UpdatePanel } from "../components/UpdatePanel";
-import { networkColors } from "../lib/format";
+import { diagnosisLine, networkColors } from "../lib/format";
 import { startAtLoginLabel } from "../lib/summary";
 import type { UpdateControls } from "../lib/useUpdater";
 
@@ -320,6 +320,11 @@ function NameRow({ link, onSave }: NameRowProps) {
             {link.osName !== link.name ? `${link.osName} · ` : ""}
             {link.description || link.kind} · Rename
           </span>
+          {link.present && link.diagnosis.checked && (
+            <span className="setting-desc" title={link.diagnosis.ispAddress ? `Provider hop: ${link.diagnosis.ispAddress}` : undefined}>
+              {diagnosisLine(link.diagnosis)}
+            </span>
+          )}
         </div>
         <ChevronRight size={16} />
       </button>

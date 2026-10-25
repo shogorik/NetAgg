@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { LinkStatus } from "../api/types";
 import {
+  diagnosisLine,
+  diagnosisProblem,
   formatAge,
   formatBytes,
   formatRate,
@@ -27,6 +29,7 @@ const link: LinkStatus = {
   osName: "Wi-Fi",
   totalBytes: 0,
   sharesLineWith: null,
+  diagnosis: { router: null, isp: null, ispAddress: null, cloudflare: null, adguard: null, checked: false },
   enabled: true,
   weight: 5,
   rxRate: 0,
@@ -114,5 +117,25 @@ describe("format", () => {
     expect(segments[2].length).toBe(0);
     // One network fills the ring with no gap.
     expect(ringSegments([100], 100, 2)).toEqual([{ length: 100, offset: 0 }]);
+  });
+});
+
+describe("diagnosis", () => {
+  const ok = { router: 2, isp: 6, ispAddress: "10.0.8.40", cloudflare: 14, adguard: 16, checked: true };
+
+  it("lists every stage, with a dash where nothing answered", () => {
+    expect(diagnosisLine(ok)).toBe("Router 2 ms · ISP 6 ms · Cloudflare 14 ms · AdGuard 16 ms");
+    expect(diagnosisLine({ ...ok, isp: null })).toBe("Router 2 ms · ISP — · Cloudflare 14 ms · AdGuard 16 ms");
+  });
+
+  it("names a problem only when the internet is out of reach", () => {
+    expect(diagnosisProblem(ok)).toBeNull();
+    // One internet target is enough; a provider that ignores pings isn't a problem.
+    expect(diagnosisProblem({ ...ok, adguard: null, isp: null })).toBeNull();
+    expect(diagnosisProblem({ ...ok, checked: false, cloudflare: null, adguard: null })).toBeNull();
+    const offline = { ...ok, cloudflare: null, adguard: null };
+    expect(diagnosisProblem({ ...offline, router: null })).toMatch(/router isn't answering/);
+    expect(diagnosisProblem({ ...offline, isp: null })).toMatch(/connection to the provider/);
+    expect(diagnosisProblem(offline)).toMatch(/internet beyond/);
   });
 });

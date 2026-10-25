@@ -335,6 +335,14 @@ button.chip:hover {
   text-overflow: ellipsis;
 }
 
+.network-problem {
+  display: block;
+  margin-top: 6px;
+  color: var(--warn);
+  font-size: 11px;
+  line-height: 14px;
+}
+
 .legend-name {
   overflow: hidden;
   text-overflow: ellipsis;

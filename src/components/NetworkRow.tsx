@@ -1,5 +1,5 @@
 import type { LinkStatus } from "../api/types";
-import { formatRate, networkMeta } from "../lib/format";
+import { diagnosisProblem, formatRate, networkMeta } from "../lib/format";
 import { NetIcon } from "./NetIcon";
 import { Toggle } from "./Toggle";
 
@@ -52,6 +52,11 @@ export function NetworkRow({ link, color, live, onEnabled }: Props) {
           onChange={onEnabled}
         />
       </div>
+      {link.present && diagnosisProblem(link.diagnosis) && (
+        <span className="network-problem" role="status">
+          {diagnosisProblem(link.diagnosis)}
+        </span>
+      )}
       {showTraffic && (
         <div className="share-track">
           <div

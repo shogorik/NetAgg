@@ -35,6 +35,21 @@ pub struct LinkInfo {
     pub present: bool,
 }
 
+/// One check of a link's path, stage by stage, in milliseconds (`None`: no
+/// answer). Narrows a problem down: the local link, the router's uplink, or
+/// further out.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Diagnosis {
+    /// A ping to the link's gateway (the router, or the phone).
+    pub router: Option<u32>,
+    /// The first hop past the gateway: the provider's side of the uplink.
+    pub isp: Option<u32>,
+    pub isp_address: Option<Ipv4Addr>,
+    /// TCP handshakes on port 443.
+    pub cloudflare: Option<u32>,
+    pub adguard: Option<u32>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HealthState {
     Unknown,
@@ -111,6 +126,8 @@ pub struct Link {
     pub stats: LinkStats,
     pub health: Mutex<Health>,
     pub rates: Mutex<Rates>,
+    /// Where along its path the link answered at the last check.
+    pub diagnosis: Mutex<Diagnosis>,
     /// Another link whose router this one's path goes through (a phone
     /// tethering the same Wi-Fi), so both share one internet line.
     pub shares_line_with: Mutex<Option<String>>,
@@ -131,6 +148,7 @@ impl Link {
                 tx_rate: 0,
                 history: VecDeque::from(vec![(0, 0); HISTORY_LEN]),
             }),
+            diagnosis: Mutex::default(),
             shares_line_with: Mutex::new(None),
             meters: Mutex::new(Vec::new()),
         }

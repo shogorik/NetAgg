@@ -17,6 +17,7 @@ const wifi: LinkStatus = {
   osName: "Wi-Fi",
   totalBytes: 0,
   sharesLineWith: null,
+  diagnosis: { router: null, isp: null, ispAddress: null, cloudflare: null, adguard: null, checked: false },
   enabled: true,
   weight: 5,
   rxRate: 0,
