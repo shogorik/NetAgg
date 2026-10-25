@@ -86,6 +86,12 @@ impl Router {
         *self.policy.write().unwrap() = policy;
     }
 
+    /// Whether `link` can take new flows: connected, passing its probes and
+    /// switched on by the user.
+    pub fn takes_flows(&self, link: &Link) -> bool {
+        link.usable() && self.policy.read().unwrap().link(&link.id).enabled
+    }
+
     /// The best link for a new flow, skipping `exclude`. Sticky keys pin a
     /// site to the link it used before, while that link is still eligible.
     pub fn choose(

@@ -143,12 +143,12 @@ impl Engine {
         let tasks = vec![
             tokio::spawn(accept(
                 stack,
-                router,
+                router.clone(),
                 intercept,
                 flows.clone(),
                 stopped.clone(),
             )),
-            tokio::spawn(close_flows_on_lost_links(links, flows.clone(), stopped)),
+            tokio::spawn(follow_links(links, router, flows.clone(), stopped)),
         ];
         log::info!("engine started");
         Ok(Engine {
@@ -430,19 +430,46 @@ fn spawn_flow(
     flows.set_abort(id, task.abort_handle());
 }
 
-/// New flows already avoid a network that's gone or failing its probes; this
-/// closes the flows still on it, so apps reconnect instead of hanging.
-async fn close_flows_on_lost_links(
+/// How long a flow must have carried nothing before a returning network may
+/// move it.
+const IDLE_BEFORE_MOVE: Duration = Duration::from_secs(30);
+
+/// Follows the networks coming and going. New flows already avoid a network
+/// that's gone or failing its probes; this closes the flows still on it, so
+/// apps reconnect instead of hanging. When a network comes back (or is
+/// switched back on), idle connections parked on the others are closed, so
+/// their apps reconnect and the balancer can use it again.
+async fn follow_links(
     links: Arc<Links>,
+    router: Arc<Router>,
     flows: Arc<Flows>,
     mut stop: watch::Receiver<bool>,
 ) {
     let mut tick = tokio::time::interval(Duration::from_secs(1));
+    let taking = |links: &Links| -> std::collections::HashSet<String> {
+        links
+            .all()
+            .into_iter()
+            .filter(|l| router.takes_flows(l))
+            .map(|l| l.id.clone())
+            .collect()
+    };
+    let mut before = taking(&links);
     loop {
         tokio::select! {
             _ = tick.tick() => {}
             _ = stopped(&mut stop) => return,
         }
+        let now = taking(&links);
+        if !before.is_empty() {
+            for back in now.difference(&before) {
+                let moved = flows.close_idle_elsewhere(back, IDLE_BEFORE_MOVE);
+                if moved > 0 {
+                    log::info!("{back}: back, closed {moved} idle flows on the other networks");
+                }
+            }
+        }
+        before = now;
         for link in links.all() {
             if !link.usable() {
                 let closed = flows.abort_on_link(&link.id);

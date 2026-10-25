@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tokio::sync::Notify;
 use tokio::task::AbortHandle;
@@ -24,6 +24,8 @@ pub struct Flow {
     pub link: OnceLock<String>,
     pub rx: AtomicU64,
     pub tx: AtomicU64,
+    /// When data last moved, in ms after `started` (0: never).
+    last_active_ms: AtomicU64,
     /// Told when a TCP flow's network has gone, so its relay can close the
     /// app's end properly.
     pub lost: Notify,
@@ -34,10 +36,24 @@ pub struct Flow {
 impl Flow {
     pub fn add_rx(&self, n: u64) {
         self.rx.fetch_add(n, Ordering::Relaxed);
+        self.touch();
     }
 
     pub fn add_tx(&self, n: u64) {
         self.tx.fetch_add(n, Ordering::Relaxed);
+        self.touch();
+    }
+
+    fn touch(&self) {
+        let ms = self.started.elapsed().as_millis() as u64;
+        self.last_active_ms.store(ms, Ordering::Relaxed);
+    }
+
+    /// How long no data has moved, counting from the start for a flow
+    /// that never carried any.
+    fn idle_for(&self) -> Duration {
+        let last = Duration::from_millis(self.last_active_ms.load(Ordering::Relaxed));
+        self.started.elapsed().saturating_sub(last)
     }
 
     fn abort(&self) {
@@ -80,6 +96,7 @@ impl Flows {
             link: OnceLock::new(),
             rx: AtomicU64::new(0),
             tx: AtomicU64::new(0),
+            last_active_ms: AtomicU64::new(0),
             lost: Notify::new(),
             losing: AtomicBool::new(false),
             abort: Mutex::new(None),
@@ -118,6 +135,20 @@ impl Flows {
         flows.iter().filter(|f| f.lose()).count()
     }
 
+    /// Closes TCP flows idle for at least `idle` on every link but
+    /// `link_id`, so their apps reconnect and the balancer places them again
+    /// now that `link_id` is there too. Busy flows stay where they are.
+    /// Returns how many were closed.
+    pub fn close_idle_elsewhere(&self, link_id: &str, idle: Duration) -> usize {
+        let flows: Vec<Arc<Flow>> = self
+            .snapshot()
+            .into_iter()
+            .filter(|f| f.proto == Proto::Tcp && f.idle_for() >= idle)
+            .filter(|f| f.link.get().is_some_and(|l| l != link_id))
+            .collect();
+        flows.iter().filter(|f| f.lose()).count()
+    }
+
     pub fn abort_all(&self) {
         self.snapshot().iter().for_each(|f| f.abort());
     }
@@ -142,6 +173,36 @@ mod tests {
 
     fn addr(port: u16) -> SocketAddr {
         SocketAddr::from(([10, 77, 0, 1], port))
+    }
+
+    #[test]
+    fn a_returning_link_frees_only_idle_tcp_flows_elsewhere() {
+        let flows = Flows::default();
+        let open = |port, proto, link: &str| {
+            let f = flows.open(proto, addr(port), addr(443));
+            f.link.set(link.into()).unwrap();
+            f
+        };
+        let tcp_phone = open(1, Proto::Tcp, "phone");
+        let udp_phone = open(2, Proto::Udp, "phone");
+        let tcp_wifi = open(3, Proto::Tcp, "wifi");
+        // Nothing has been idle for an hour.
+        assert_eq!(
+            flows.close_idle_elsewhere("wifi", Duration::from_secs(3600)),
+            0
+        );
+        // With no threshold: the phone's TCP flow goes; UDP and the flow
+        // on the returning Wi-Fi stay.
+        assert_eq!(flows.close_idle_elsewhere("wifi", Duration::ZERO), 1);
+        assert!(tcp_phone.losing.load(Ordering::Relaxed));
+        assert!(!udp_phone.losing.load(Ordering::Relaxed));
+        assert!(!tcp_wifi.losing.load(Ordering::Relaxed));
+        // Moving data resets the idle time.
+        let busy = open(4, Proto::Tcp, "phone");
+        std::thread::sleep(Duration::from_millis(50));
+        assert!(busy.idle_for() >= Duration::from_millis(50));
+        busy.add_rx(1);
+        assert!(busy.idle_for() < Duration::from_millis(50));
     }
 
     #[tokio::test]
