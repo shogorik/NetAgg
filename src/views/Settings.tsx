@@ -7,8 +7,8 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronRight } from "lucide-react";
-import { errorText, setLinkWeight, setOption } from "../api/commands";
-import type { OptionChange, Status } from "../api/types";
+import { errorText, setDefaultLink, setLinkLabel, setLinkWeight, setOption } from "../api/commands";
+import type { LinkStatus, OptionChange, Status } from "../api/types";
 import { hidePopup } from "../api/window";
 import { SubHeader } from "../components/Header";
 import { Toggle } from "../components/Toggle";
@@ -70,6 +70,32 @@ export function Settings({ status, onStatus, onBack, update }: Props) {
             onChange={(captureIpv6) => change({ captureIpv6 })}
           />
         </Section>
+
+        {status.links.length > 0 && (
+          <>
+            <div className="divider" />
+            <Section title="Networks">
+              {status.platform === "windows" && (
+                <DefaultRow
+                  links={status.links}
+                  chosen={settings.defaultLink}
+                  onChange={(id) =>
+                    setDefaultLink(id)
+                      .then(onStatus)
+                      .catch((e) => setError(errorText(e)))
+                  }
+                />
+              )}
+              {status.links.map((link) => (
+                <NameRow
+                  key={link.id}
+                  link={link}
+                  onSave={(label) => setLinkLabel(link.id, label).then(onStatus)}
+                />
+              ))}
+            </Section>
+          </>
+        )}
 
         {present.length > 0 && (
           <>
@@ -212,6 +238,113 @@ function WeightRow({ name, color, weight, onCommit }: WeightRowProps) {
         style={{ "--fill": `${((value - 1) / 9) * 100}%` } as CSSProperties}
         onChange={(e) => slide(Number(e.target.value))}
       />
+    </div>
+  );
+}
+
+interface DefaultRowProps {
+  links: LinkStatus[];
+  chosen: string | null;
+  onChange: (id: string | null) => void;
+}
+
+/** Which network Windows routes through by default, MultiPath on or off. */
+function DefaultRow({ links, chosen, onChange }: DefaultRowProps) {
+  // A chosen network that's unplugged stays listed, so the choice is visible.
+  const options = links.filter((l) => l.present || l.id === chosen);
+  return (
+    <div className="setting-row">
+      <div className="setting-text">
+        <span className="setting-label">Default network</span>
+        <select
+          className="text-input"
+          aria-label="Default network"
+          value={chosen ?? ""}
+          onChange={(e) => onChange(e.target.value || null)}
+        >
+          <option value="">Automatic (avoids phones while another network is up)</option>
+          {options.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.present ? l.name : `${l.name} (not connected)`}
+            </option>
+          ))}
+        </select>
+        <span className="setting-desc">
+          What Windows uses while MultiPath is off, and for traffic it doesn't carry. Applied while MultiPath has
+          administrator rights.
+        </span>
+      </div>
+    </div>
+  );
+}
+
+interface NameRowProps {
+  link: LinkStatus;
+  onSave: (label: string) => Promise<unknown>;
+}
+
+/** One network's name, edited in place; empty goes back to the automatic name. */
+function NameRow({ link, onSave }: NameRowProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const save = () =>
+    onSave(draft)
+      .then(() => setEditing(false))
+      .catch((e) => setError(errorText(e)));
+
+  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") void save();
+    if (e.key === "Escape") {
+      // Close the editor, not the page.
+      e.stopPropagation();
+      setEditing(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="setting-row"
+        onClick={() => {
+          setDraft(link.name);
+          setError(null);
+          setEditing(true);
+        }}
+      >
+        <div className="setting-text">
+          <span className="setting-label">{link.name}</span>
+          <span className="setting-desc">
+            {link.osName !== link.name ? `${link.osName} · ` : ""}
+            {link.description || link.kind} · Rename
+          </span>
+        </div>
+        <ChevronRight size={16} />
+      </button>
+    );
+  }
+
+  return (
+    <div className="setting-row">
+      <div className="setting-text">
+        <span className="setting-label">Name for {link.osName}</span>
+        <input
+          className="text-input"
+          value={draft}
+          autoFocus
+          maxLength={40}
+          spellCheck={false}
+          aria-label={`Name for ${link.osName}`}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={onKey}
+          onBlur={() => setEditing(false)}
+        />
+        <span className="setting-desc" style={error ? { color: "var(--warn)" } : undefined}>
+          {error ?? "Enter saves. Leave it empty for the automatic name."}
+        </span>
+      </div>
     </div>
   );
 }

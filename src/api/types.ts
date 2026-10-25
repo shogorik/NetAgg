@@ -15,6 +15,8 @@ export interface LinkStatus {
   health: Health;
   present: boolean;
   isDefault: boolean;
+  /** What the system calls it, shown when renaming. */
+  osName: string;
   enabled: boolean;
   weight: number;
   /** Bytes per second. */
@@ -40,6 +42,8 @@ export interface SettingsStatus {
   checkUpdates: boolean;
   /** Leave unplugged and unconnected networks out of the list. */
   hideUnavailable: boolean;
+  /** The network Windows routes through by default; null is automatic. */
+  defaultLink: string | null;
 }
 
 export type DnsMode = "auto" | "manual";

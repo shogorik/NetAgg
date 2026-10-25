@@ -62,6 +62,8 @@ pub fn run() {
             commands::set_enabled,
             commands::set_link_enabled,
             commands::set_link_weight,
+            commands::set_link_label,
+            commands::set_default_link,
             commands::set_option,
             commands::list_connections,
             commands::prepare_update_install,
@@ -77,6 +79,7 @@ pub fn run() {
             let state = AppState::new(app.path().app_config_dir()?, autostart::is_enabled());
             let can_start = elevated || sys::elevates_in_place();
             let start = can_start && (turn_on || state.settings().on);
+            state.apply_default_route();
             app.manage(state);
             tray::create(app.handle())?;
             ticker::spawn(app.handle().clone());

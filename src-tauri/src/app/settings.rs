@@ -51,6 +51,9 @@ pub struct Settings {
     /// Leave networks that aren't there (unplugged, not connected) out of the
     /// popup's list.
     pub hide_unavailable: bool,
+    /// The network the OS should route through by default (a link id), or
+    /// automatic: never a phone while another network is up.
+    pub default_link: Option<String>,
 }
 
 impl Default for Settings {
@@ -68,6 +71,7 @@ impl Default for Settings {
             enforce_dns: true,
             check_updates: false,
             hide_unavailable: false,
+            default_link: None,
         }
     }
 }

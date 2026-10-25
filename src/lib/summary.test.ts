@@ -14,6 +14,7 @@ const wifi: LinkStatus = {
   health: "up",
   present: true,
   isDefault: true,
+  osName: "Wi-Fi",
   enabled: true,
   weight: 5,
   rxRate: 0,
@@ -38,7 +39,7 @@ const off: Status = {
   connections: 0,
   todayBytes: 0,
   links: [wifi, phone, cable],
-  settings: { adaptive: true, sticky: false, captureIpv6: false, dnsMode: "auto", dns: [], enforceDns: true, startOnLogin: false, checkUpdates: false, hideUnavailable: false },
+  settings: { adaptive: true, sticky: false, captureIpv6: false, dnsMode: "auto", dns: [], enforceDns: true, startOnLogin: false, checkUpdates: false, hideUnavailable: false, defaultLink: null },
 };
 const on: Status = { ...off, on: true, connections: 142, todayBytes: 3_400_000_000 };
 

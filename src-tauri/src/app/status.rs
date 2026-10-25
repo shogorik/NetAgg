@@ -56,6 +56,8 @@ pub struct LinkStatus {
     pub present: bool,
     /// The network the system uses on its own.
     pub is_default: bool,
+    /// What the OS calls it, for the rename editor.
+    pub os_name: String,
     pub enabled: bool,
     pub weight: u32,
     pub rx_rate: u64,
@@ -77,6 +79,7 @@ pub struct SettingsStatus {
     pub start_on_login: bool,
     pub check_updates: bool,
     pub hide_unavailable: bool,
+    pub default_link: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -128,7 +131,17 @@ pub fn percents(values: &[u64]) -> Vec<u8> {
 
 pub fn build(state: &AppState) -> Status {
     let settings = state.settings();
-    let default_id = state.links.default_link().map(|l| l.id.clone());
+    // While on, the OS default is MultiPath's own adapter, and the last real
+    // one seen may be from before MultiPath changed it.
+    let default_id = match state.applied_default() {
+        Some(index) => state
+            .links
+            .all()
+            .into_iter()
+            .find(|l| l.info().if_index == index),
+        None => state.links.default_link(),
+    }
+    .map(|l| l.id.clone());
     let mut links: Vec<LinkStatus> = state
         .links
         .all()
@@ -146,7 +159,8 @@ pub fn build(state: &AppState) -> Status {
             };
             LinkStatus {
                 id: link.id.clone(),
-                name: prefs.label.clone().unwrap_or(info.name),
+                name: prefs.label.clone().unwrap_or_else(|| info.display_name()),
+                os_name: info.name.clone(),
                 description: info.description,
                 kind: info.kind,
                 address: info
@@ -211,6 +225,7 @@ pub fn build(state: &AppState) -> Status {
             start_on_login: state.start_on_login.load(Ordering::Relaxed),
             check_updates: settings.check_updates,
             hide_unavailable: settings.hide_unavailable,
+            default_link: settings.default_link.clone(),
         },
     }
 }
@@ -296,7 +311,10 @@ fn build_link_names(state: &AppState) -> HashMap<String, String> {
         .all()
         .iter()
         .map(|l| {
-            let name = settings.link(&l.id).label.unwrap_or_else(|| l.info().name);
+            let name = settings
+                .link(&l.id)
+                .label
+                .unwrap_or_else(|| l.info().display_name());
             (l.id.clone(), name)
         })
         .collect()

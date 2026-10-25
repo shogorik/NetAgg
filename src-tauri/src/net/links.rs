@@ -202,6 +202,52 @@ impl Link {
     }
 }
 
+impl LinkInfo {
+    /// What to call the network when the user hasn't named it. Windows
+    /// calls a USB-tethered phone "Ethernet 2" and Linux "usb0", which says
+    /// nothing about it being a phone and its data.
+    pub fn display_name(&self) -> String {
+        let says_phone = ["phone", "android", "pixel", "galaxy"]
+            .iter()
+            .any(|n| self.name.to_lowercase().contains(n));
+        if self.kind == "phone" && !says_phone {
+            "Phone (USB tethering)".to_owned()
+        } else {
+            self.name.clone()
+        }
+    }
+
+    /// A phone's or mobile network's data, usually limited.
+    fn metered(&self) -> bool {
+        matches!(self.kind, "phone" | "cellular")
+    }
+}
+
+/// The interface the OS should route through by default. The user's choice
+/// while it's connected; otherwise, when a metered network (a phone) and an
+/// unmetered one are both up, the best unmetered one: wired before Wi-Fi.
+/// `None` leaves the OS to its own choice.
+fn pick_default(links: &[LinkInfo], chosen: Option<u32>) -> Option<u32> {
+    let present = || links.iter().filter(|l| l.present);
+    if let Some(chosen) = chosen {
+        if present().any(|l| l.if_index == chosen) {
+            return Some(chosen);
+        }
+    }
+    if !present().any(LinkInfo::metered) {
+        return None;
+    }
+    let rank = |l: &LinkInfo| match l.kind {
+        "ethernet" => 0,
+        "wifi" => 1,
+        _ => 2,
+    };
+    present()
+        .filter(|l| !l.metered())
+        .min_by_key(|l| (rank(l), l.if_index))
+        .map(|l| l.if_index)
+}
+
 fn kind_of(itf: &netdev::Interface) -> &'static str {
     #[cfg(target_os = "linux")]
     if let Some(kind) = sys::adapter_kind(&itf.name) {
@@ -346,6 +392,16 @@ impl Links {
             .find(|l| l.info.read().unwrap().if_index == index)
     }
 
+    /// The interface the OS should route through by default (see
+    /// `pick_default`), given the link the user chose, if any.
+    pub fn preferred_default(&self, chosen: Option<&str>) -> Option<u32> {
+        let chosen = chosen
+            .and_then(|id| self.get(id))
+            .map(|l| l.info().if_index);
+        let infos: Vec<LinkInfo> = self.all().iter().map(|l| l.info()).collect();
+        pick_default(&infos, chosen)
+    }
+
     pub fn get(&self, id: &str) -> Option<Arc<Link>> {
         self.all().into_iter().find(|l| l.id == id)
     }
@@ -436,6 +492,62 @@ impl Links {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn net(if_index: u32, kind: &'static str, name: &str, present: bool) -> LinkInfo {
+        LinkInfo {
+            if_index,
+            name: name.into(),
+            kind,
+            present,
+            ..test_info()
+        }
+    }
+
+    #[test]
+    fn phones_get_a_name_that_says_so() {
+        assert_eq!(
+            net(1, "phone", "Ethernet 2", true).display_name(),
+            "Phone (USB tethering)"
+        );
+        assert_eq!(
+            net(1, "phone", "usb0", true).display_name(),
+            "Phone (USB tethering)"
+        );
+        assert_eq!(
+            net(1, "phone", "iPhone USB", true).display_name(),
+            "iPhone USB"
+        );
+        assert_eq!(
+            net(1, "ethernet", "Ethernet", true).display_name(),
+            "Ethernet"
+        );
+    }
+
+    #[test]
+    fn default_avoids_the_phone_unless_chosen() {
+        let wifi = net(17, "wifi", "Wi-Fi", true);
+        let phone = net(16, "phone", "Ethernet", true);
+        let wired = net(20, "ethernet", "Ethernet 3", true);
+        // Automatic: the phone never wins while something else is up.
+        assert_eq!(pick_default(&[phone.clone(), wifi.clone()], None), Some(17));
+        assert_eq!(
+            pick_default(&[phone.clone(), wifi.clone(), wired.clone()], None),
+            Some(20)
+        );
+        // Nothing metered: Windows' own choice stands.
+        assert_eq!(pick_default(&[wifi.clone(), wired.clone()], None), None);
+        // Only the phone: nothing better to choose.
+        assert_eq!(pick_default(std::slice::from_ref(&phone), None), None);
+        // The user's choice wins, the phone included...
+        assert_eq!(
+            pick_default(&[phone.clone(), wifi.clone()], Some(16)),
+            Some(16)
+        );
+        // ...while it's connected; then automatic again.
+        let gone = net(16, "phone", "Ethernet", false);
+        assert_eq!(pick_default(&[gone.clone(), wifi.clone()], Some(16)), None);
+        assert_eq!(pick_default(&[gone, wifi, wired], Some(16)), None);
+    }
 
     #[test]
     fn busy_counts_new_and_downloading_flows() {

@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
@@ -43,6 +43,10 @@ pub struct AppState {
     pub error: Mutex<Option<String>>,
     pub start_on_login: AtomicBool,
     pub flow_counts: Mutex<FlowCounts>,
+    /// The interface last made the default route (0: none), so it's only
+    /// changed when the choice changes. Starts unknown, so the first call
+    /// also undoes a choice an earlier run left.
+    default_applied: AtomicU32,
     /// Keeps the health probes running for as long as the app does.
     health_stop: watch::Sender<bool>,
 }
@@ -68,6 +72,7 @@ impl AppState {
             error: Mutex::new(None),
             start_on_login: AtomicBool::new(start_on_login),
             flow_counts: Mutex::new(FlowCounts::default()),
+            default_applied: AtomicU32::new(u32::MAX),
             health_stop: watch::channel(false).0,
         }
     }
@@ -94,6 +99,40 @@ impl AppState {
 
     pub fn save_usage(&self) {
         self.usage.lock().unwrap().save(&self.usage_path);
+    }
+
+    /// The interface MultiPath made the default route, if it made one.
+    pub fn applied_default(&self) -> Option<u32> {
+        match self.default_applied.load(Ordering::Relaxed) {
+            0 | u32::MAX => None,
+            index => Some(index),
+        }
+    }
+
+    /// Points the OS default route at the chosen (or automatically picked)
+    /// network. Windows only, and only with administrator rights; otherwise
+    /// the choice waits for a run that has them.
+    pub fn apply_default_route(&self) {
+        #[cfg(windows)]
+        {
+            if !crate::sys::is_elevated() {
+                return;
+            }
+            let chosen = self.settings().default_link;
+            let target = self.links.preferred_default(chosen.as_deref());
+            let code = target.unwrap_or(0);
+            if self.default_applied.swap(code, Ordering::Relaxed) == code {
+                return;
+            }
+            match crate::sys::prefer_interface(target) {
+                Ok(()) => log::info!("default route: {target:?}"),
+                Err(err) => {
+                    log::warn!("couldn't set the default route: {err}");
+                    // Try again on the next refresh.
+                    self.default_applied.store(u32::MAX, Ordering::Relaxed);
+                }
+            }
+        }
     }
 
     /// Starts capturing. Needs administrator rights.

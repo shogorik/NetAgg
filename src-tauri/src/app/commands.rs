@@ -82,6 +82,33 @@ pub fn set_link_enabled(app: AppHandle, id: String, enabled: bool) -> Result<Sta
     Ok(status)
 }
 
+/// Names a network; an empty name goes back to the automatic one.
+#[tauri::command]
+pub fn set_link_label(app: AppHandle, id: String, label: String) -> Result<Status, String> {
+    let label = label.trim();
+    if label.chars().count() > MAX_LABEL {
+        return Err(format!("keep the name under {MAX_LABEL} characters"));
+    }
+    let label = (!label.is_empty()).then(|| label.to_owned());
+    update_link(&app, id, |p| p.label = label)
+}
+
+const MAX_LABEL: usize = 40;
+
+/// Chooses the network the OS routes through by default; `None` is automatic.
+#[tauri::command]
+pub fn set_default_link(app: AppHandle, id: Option<String>) -> Result<Status, String> {
+    let state = app.state::<AppState>();
+    if let Some(id) = &id {
+        if state.links.get(id).is_none() {
+            return Err(format!("no network {id}"));
+        }
+    }
+    state.update_settings(|s| s.default_link = id);
+    state.apply_default_route();
+    Ok(current(&app))
+}
+
 #[tauri::command]
 pub fn set_link_weight(app: AppHandle, id: String, weight: u32) -> Result<Status, String> {
     update_link(&app, id, |p| p.weight = weight.clamp(1, 10))

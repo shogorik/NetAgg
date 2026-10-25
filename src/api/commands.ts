@@ -15,6 +15,13 @@ export const setLinkEnabled = (id: string, enabled: boolean) =>
 export const setLinkWeight = (id: string, weight: number) =>
   invoke<Status>("set_link_weight", { id, weight });
 
+/** An empty name goes back to the automatic one. */
+export const setLinkLabel = (id: string, label: string) =>
+  invoke<Status>("set_link_label", { id, label });
+
+/** `null` lets MultiPath pick: never a phone while another network is up. */
+export const setDefaultLink = (id: string | null) => invoke<Status>("set_default_link", { id });
+
 export const setOption = (change: OptionChange) => invoke<Status>("set_option", { change });
 
 export const listConnections = () => invoke<Connection[]>("list_connections");

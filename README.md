@@ -112,7 +112,13 @@ proportionally more.
   (`https://dns.google/dns-query#8.8.8.8`; a server named by host name needs its IP after `#`, so its name is never
   looked up in the clear). Encrypted servers are never retried unencrypted. With your own servers, *Block other DNS*
   (on by default) answers every app's lookups with them and, on Windows, blocks port 53 anywhere but through MultiPath.
-- **Turning MultiPath off** removes everything it added, so your system goes back to normal.
+- **Default network (Windows):** Settings → Networks picks the network Windows itself routes through, which matters
+  while MultiPath is off and for traffic it doesn't carry. Automatic never picks a USB-tethered phone while another network
+  is up; or choose one yourself. MultiPath sets that network's interface metric to 2 (active store only, so a reboot
+  undoes it until MultiPath runs again with administrator rights) and gives it back to Windows when you switch to
+  Automatic or another network. Networks can be renamed there too; a phone shows as "Phone (USB tethering)".
+- **Turning MultiPath off** removes everything it added, so your system goes back to normal. (The default
+  network choice stays in effect until reboot, so the phone doesn't take over your traffic.)
 
 ## Install
 

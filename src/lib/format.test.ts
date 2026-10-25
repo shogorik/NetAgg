@@ -24,6 +24,7 @@ const link: LinkStatus = {
   health: "up",
   present: true,
   isDefault: true,
+  osName: "Wi-Fi",
   enabled: true,
   weight: 5,
   rxRate: 0,

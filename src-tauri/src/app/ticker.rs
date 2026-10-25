@@ -68,6 +68,8 @@ impl Ticks {
         if self.n.is_multiple_of(REFRESH_EVERY) {
             let links = state.links.clone();
             let _ = tokio::task::spawn_blocking(move || links.refresh()).await;
+            // Networks come and go; the default follows the choice.
+            state.apply_default_route();
         }
         state.check_engine().await;
     }
