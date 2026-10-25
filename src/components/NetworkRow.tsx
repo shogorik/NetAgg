@@ -20,10 +20,11 @@ export function NetworkRow({ link, color, live, onEnabled }: Props) {
     detail = "Not available";
   } else if (showTraffic) {
     value = formatRate(link.rxRate);
-    detail = `${link.share}% · ${link.connections} conn`;
+    // Where Windows sends what MultiPath doesn't carry, and everything once it's off.
+    detail = `${link.share}% · ${link.connections} conn${link.isDefault ? " · default" : ""}`;
   } else if (live) {
     value = "—";
-    detail = "Not used";
+    detail = link.isDefault ? "Not used · default" : "Not used";
   } else {
     value = link.latencyMs != null ? `${link.latencyMs} ms` : "—";
     detail = link.isDefault ? "Default route" : "Ready";
