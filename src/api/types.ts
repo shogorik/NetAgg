@@ -66,6 +66,8 @@ export interface Status {
   todayBytes: number;
   links: LinkStatus[];
   settings: SettingsStatus;
+  /** Windows drops Wi-Fi while a wired-looking network (a USB-tethered phone) is up. */
+  dropsWifi: boolean;
 }
 
 export interface Connection {

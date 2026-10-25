@@ -118,6 +118,18 @@ pub fn set_link_label(app: AppHandle, id: String, label: String) -> Result<Statu
 
 const MAX_LABEL: usize = 40;
 
+/// Lets Windows keep Wi-Fi up next to a wired-looking network (see
+/// `Status::drops_wifi`). Windows applies it at the next sign-in.
+#[tauri::command]
+pub async fn allow_simultaneous_connections(app: AppHandle) -> Result<Status, String> {
+    #[cfg(windows)]
+    tauri::async_runtime::spawn_blocking(sys::allow_simultaneous_connections)
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("Couldn't change the Windows setting: {e}"))?;
+    Ok(current(&app))
+}
+
 /// Chooses the network the OS routes through by default; `None` is automatic.
 #[tauri::command]
 pub fn set_default_link(app: AppHandle, id: Option<String>) -> Result<Status, String> {

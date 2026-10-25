@@ -64,6 +64,7 @@ pub fn run() {
             commands::set_link_weight,
             commands::set_link_label,
             commands::set_default_link,
+            commands::allow_simultaneous_connections,
             commands::set_option,
             commands::list_connections,
             commands::prepare_update_install,

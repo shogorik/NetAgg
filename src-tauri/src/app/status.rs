@@ -35,6 +35,10 @@ pub struct Status {
     pub today_bytes: u64,
     pub links: Vec<LinkStatus>,
     pub settings: SettingsStatus,
+    /// Windows will drop Wi-Fi while a wired-looking network (a USB-tethered
+    /// phone) is up, because of its "minimize simultaneous connections"
+    /// policy.
+    pub drops_wifi: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -200,6 +204,7 @@ pub fn build(state: &AppState) -> Status {
     // The default network first, then connected ones, as in the design.
     links.sort_by_key(|l| (!l.is_default, !l.present));
 
+    let drops_wifi = drops_wifi(&links);
     let flows = state.flows.read().unwrap().clone();
     Status {
         platform: std::env::consts::OS,
@@ -214,6 +219,7 @@ pub fn build(state: &AppState) -> Status {
         tx_rate: links.iter().map(|l| l.tx_rate).sum(),
         connections: flows.map_or(0, |f| f.len()),
         today_bytes: state.usage.lock().unwrap().today(sys::local_date()),
+        drops_wifi,
         links,
         settings: SettingsStatus {
             adaptive: settings.adaptive,
@@ -227,6 +233,24 @@ pub fn build(state: &AppState) -> Status {
             hide_unavailable: settings.hide_unavailable,
             default_link: settings.default_link.clone(),
         },
+    }
+}
+
+/// Said only where it bites: a Wi-Fi network next to a connected
+/// wired-looking one (Wi-Fi itself may already have been dropped).
+fn drops_wifi(links: &[LinkStatus]) -> bool {
+    #[cfg(windows)]
+    {
+        links.iter().any(|l| l.kind == "wifi")
+            && links
+                .iter()
+                .any(|l| l.present && matches!(l.kind, "phone" | "ethernet"))
+            && sys::minimizes_connections()
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = links;
+        false
     }
 }
 

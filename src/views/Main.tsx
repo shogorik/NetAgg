@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CircleArrowUp, Gauge, ShieldCheck } from "lucide-react";
-import { errorText, setEnabled, setLinkEnabled } from "../api/commands";
+import { allowSimultaneousConnections, errorText, setEnabled, setLinkEnabled } from "../api/commands";
 import type { Status } from "../api/types";
 import { hidePopup } from "../api/window";
 import { Footer } from "../components/Footer";
@@ -23,6 +23,17 @@ interface Props {
 export function Main({ status, onStatus, onSettings, onConnections, update }: Props) {
   const [pending, setPending] = useState<Pending>(null);
   const [error, setError] = useState<string | null>(null);
+  const [signInNeeded, setSignInNeeded] = useState(false);
+
+  const allowBoth = () => {
+    setError(null);
+    allowSimultaneousConnections()
+      .then((s) => {
+        onStatus(s);
+        setSignInNeeded(true);
+      })
+      .catch((e) => setError(errorText(e)));
+  };
 
   const turn = (on: boolean) => {
     setPending(on ? "on" : "off");
@@ -63,6 +74,20 @@ export function Main({ status, onStatus, onSettings, onConnections, update }: Pr
       {notice && (
         <div className="notice" role="alert">
           {notice}
+        </div>
+      )}
+      {status.dropsWifi && (
+        <div className="notice" role="alert">
+          Windows drops Wi-Fi while the tethered phone is connected, because it treats the phone as a cable
+          connection.{" "}
+          <button type="button" className="link-button" onClick={allowBoth}>
+            Keep both connected
+          </button>
+        </div>
+      )}
+      {signInNeeded && (
+        <div className="notice" role="status">
+          Done. Sign out and back in (or restart) for Windows to keep Wi-Fi connected.
         </div>
       )}
       {update.step === "available" && (

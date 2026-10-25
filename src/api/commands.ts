@@ -19,6 +19,9 @@ export const setLinkWeight = (id: string, weight: number) =>
 export const setLinkLabel = (id: string, label: string) =>
   invoke<Status>("set_link_label", { id, label });
 
+/** Lets Windows keep Wi-Fi next to a tethered phone; applies at the next sign-in. */
+export const allowSimultaneousConnections = () => invoke<Status>("allow_simultaneous_connections");
+
 /** `null` lets NetAgg pick: never a phone while another network is up. */
 export const setDefaultLink = (id: string | null) => invoke<Status>("set_default_link", { id });
 
