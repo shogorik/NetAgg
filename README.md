@@ -9,7 +9,7 @@
 A small tray app for **Windows, Linux and macOS (Apple silicon)**, built with **Tauri v2 and Rust**. Everything runs
 on your computer: no server, no relay, no account.
 
-<a href="https://github.com/uditya-kumar/MultiPath/releases/latest"><img src="https://img.shields.io/badge/Download-Latest%20release-4CC2FF?style=for-the-badge&logoColor=white" alt="Download the latest release" /></a>
+<a href="https://github.com/shogorik/MultiPath-Hardened/releases/latest"><img src="https://img.shields.io/badge/Download-Latest%20release-4CC2FF?style=for-the-badge&logoColor=white" alt="Download the latest release" /></a>
 
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-deb%20%7C%20AppImage-FCC624?logo=linux&logoColor=black)
@@ -106,12 +106,17 @@ proportionally more.
 - **Switching it back on** only gets *new* connections. Downloads already running stay where they are until they finish
   or reconnect.
 - **IPv6** is only used on networks where it actually works. Otherwise apps are told to use IPv4 straight away.
-- **DNS** goes to 8.8.8.8, then 1.1.1.1 (some ISPs block 1.1.1.1). You can change this in Settings.
+- **DNS** is answered by MultiPath itself (the adapter's DNS server is 10.77.0.53). By default (**Auto**) each lookup goes
+  to the DNS servers of a network (what its router handed out), through that same network. In Settings → DNS you can
+  switch to **your own servers** instead: plain (`9.9.9.9`), DNS-over-TLS (`tls://1.1.1.1`) or DNS-over-HTTPS
+  (`https://dns.google/dns-query#8.8.8.8`; a server named by host name needs its IP after `#`, so its name is never
+  looked up in the clear). Encrypted servers are never retried unencrypted. With your own servers, *Block other DNS*
+  (on by default) answers every app's lookups with them and, on Windows, blocks port 53 anywhere but through MultiPath.
 - **Turning MultiPath off** removes everything it added, so your system goes back to normal.
 
 ## Install
 
-Everything is on the [latest release](https://github.com/uditya-kumar/MultiPath/releases/latest) page.
+Everything is on the [latest release](https://github.com/shogorik/MultiPath-Hardened/releases/latest) page.
 
 ### Windows
 

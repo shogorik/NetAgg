@@ -105,7 +105,25 @@ export function Settings({ status, onStatus, onBack, update }: Props) {
             on={settings.hideUnavailable}
             onChange={(hideUnavailable) => change({ hideUnavailable })}
           />
+        </Section>
+
+        <div className="divider" />
+        <Section title="DNS">
+          <SwitchRow
+            label="Use each network's own DNS"
+            desc="Lookups go to the servers each network hands out (usually its router), through that network."
+            on={settings.dnsMode === "auto"}
+            onChange={(auto) => change({ dnsMode: auto ? "auto" : "manual" })}
+          />
           <DnsRow dns={settings.dns} onSave={(dns) => setOption({ dns }).then(onStatus)} />
+          {settings.dnsMode === "manual" && (
+            <SwitchRow
+              label="Block other DNS"
+              desc="Every app's lookups go to your servers, even ones that name their own. Turn off only if an app breaks."
+              on={settings.enforceDns}
+              onChange={(enforceDns) => change({ enforceDns })}
+            />
+          )}
         </Section>
 
         <div className="divider" />
@@ -203,7 +221,7 @@ interface DnsRowProps {
   onSave: (dns: string[]) => Promise<unknown>;
 }
 
-/** The DNS servers MultiPath answers lookups with, edited in place. */
+/** The servers for manual DNS, edited in place. */
 function DnsRow({ dns, onSave }: DnsRowProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -239,8 +257,8 @@ function DnsRow({ dns, onSave }: DnsRowProps) {
     return (
       <button type="button" className="setting-row" onClick={open}>
         <div className="setting-text">
-          <span className="setting-label">DNS servers</span>
-          <span className="setting-desc">{dns.join(", ")}</span>
+          <span className="setting-label">Your DNS servers</span>
+          <span className="setting-desc">{dns.length > 0 ? dns.join(", ") : "None yet. Add some to stop using each network's own."}</span>
         </div>
         <ChevronRight size={16} />
       </button>
@@ -250,7 +268,7 @@ function DnsRow({ dns, onSave }: DnsRowProps) {
   return (
     <div className="setting-row">
       <div className="setting-text">
-        <span className="setting-label">DNS servers</span>
+        <span className="setting-label">Your DNS servers</span>
         <input
           className="text-input"
           value={draft}
@@ -262,7 +280,8 @@ function DnsRow({ dns, onSave }: DnsRowProps) {
           onBlur={() => setEditing(false)}
         />
         <span className="setting-desc" style={error ? { color: "var(--warn)" } : undefined}>
-          {error ?? "Separate with commas. Press Enter to save."}
+          {error ??
+            "9.9.9.9, tls://1.1.1.1 or https://dns.google/dns-query#8.8.8.8 (a name needs its IP after #). Separate with commas; Enter saves."}
         </span>
       </div>
     </div>

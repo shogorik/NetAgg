@@ -28,7 +28,9 @@
         "windowEffects": { "effects": ["mica"] }
       }
     ],
-    "security": { "csp": null },
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+    },
     "macOSPrivateApi": true
   },
   "bundle": {
@@ -41,8 +43,8 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMzRDJFNDE0REE3MEU1MkQKUldRdDVYRGFGT1RTTTcrTlVwYUc2aUhoWFNsY3NhTlVkUnhZaVpsdkgwOWhLbHExY2tPdmFhVHUK",
-      "endpoints": ["https://github.com/uditya-kumar/MultiPath/releases/latest/download/latest.json"],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM0RjgxNEIzMzA0RjU1MDEKUldRQlZVOHdzeFQ0TkJIbVk0aEhuUytYejNKWjlJSkE3cDVQUzRKQTYrbU9nKy9PUlk3dUVPbG0K",
+      "endpoints": ["https://github.com/shogorik/MultiPath-Hardened/releases/latest/download/latest.json"],
       "requireSignedVersion": true
     }
   }

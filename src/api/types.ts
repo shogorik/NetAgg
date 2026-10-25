@@ -29,13 +29,20 @@ export interface SettingsStatus {
   adaptive: boolean;
   sticky: boolean;
   captureIpv6: boolean;
+  /** auto: each network's own DNS servers; manual: `dns`. */
+  dnsMode: DnsMode;
+  /** The servers for manual DNS, as typed. */
   dns: string[];
+  /** With manual DNS, answer every app's lookups with `dns` and block the rest. */
+  enforceDns: boolean;
   startOnLogin: boolean;
   /** Look for a new version when MultiPath starts (never installs on its own). */
   checkUpdates: boolean;
   /** Leave unplugged and unconnected networks out of the list. */
   hideUnavailable: boolean;
 }
+
+export type DnsMode = "auto" | "manual";
 
 export type Platform = "windows" | "linux" | "macos";
 
@@ -77,7 +84,9 @@ export interface OptionChange {
   adaptive?: boolean;
   sticky?: boolean;
   captureIpv6?: boolean;
+  dnsMode?: DnsMode;
   dns?: string[];
+  enforceDns?: boolean;
   startOnLogin?: boolean;
   checkUpdates?: boolean;
   hideUnavailable?: boolean;

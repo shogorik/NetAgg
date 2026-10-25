@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::net::IpAddr;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
 use crate::net::balancer::{LinkPolicy, Policy};
+use crate::net::dns::{DnsMode, Upstream};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -37,7 +37,13 @@ pub struct Settings {
     /// Scale each network's share by the throughput it has actually delivered.
     pub adaptive: bool,
     pub capture_ipv6: bool,
-    pub dns: Vec<IpAddr>,
+    /// Auto: each network's own DNS servers. Manual: `dns`.
+    pub dns_mode: DnsMode,
+    /// The servers for manual DNS, as typed (see `Upstream::parse`).
+    pub dns: Vec<String>,
+    /// With manual DNS, answer every app's queries with `dns` and block
+    /// any that would go around MultiPath.
+    pub enforce_dns: bool,
     /// Look for a new version when MultiPath starts. Off by default: it's the
     /// only thing MultiPath would contact on its own, and it never installs
     /// anything without the user's say-so.
@@ -55,8 +61,11 @@ impl Default for Settings {
             sticky: false,
             adaptive: true,
             capture_ipv6: true,
-            // Some ISPs (Jio among them) drop DNS queries to 1.1.1.1.
-            dns: vec!["8.8.8.8".parse().unwrap(), "1.1.1.1".parse().unwrap()],
+            // No servers picked for the user: Auto uses what each network
+            // hands out, and Manual waits for the user's own choice.
+            dns_mode: DnsMode::Auto,
+            dns: Vec::new(),
+            enforce_dns: true,
             check_updates: false,
             hide_unavailable: false,
         }
@@ -86,6 +95,11 @@ impl Settings {
             adaptive: self.adaptive,
             block_ipv6: !self.capture_ipv6,
         }
+    }
+
+    /// The manual servers, checked.
+    pub fn upstreams(&self) -> Result<Vec<Upstream>, String> {
+        self.dns.iter().map(|s| Upstream::parse(s)).collect()
     }
 
     pub fn load(path: &PathBuf) -> Settings {
@@ -121,6 +135,24 @@ mod tests {
         assert!(!old.check_updates && old.sticky && !old.on);
         let chosen: Settings = serde_json::from_str(r#"{"checkUpdates":true}"#).unwrap();
         assert!(chosen.check_updates);
+    }
+
+    #[test]
+    fn dns_is_auto_unless_chosen() {
+        let fresh = Settings::default();
+        assert_eq!(fresh.dns_mode, DnsMode::Auto);
+        assert!(fresh.dns.is_empty() && fresh.enforce_dns);
+        // 1.2.0 saved its fixed servers as plain addresses; they stay as the
+        // manual list, but nothing switches to it.
+        let old: Settings = serde_json::from_str(r#"{"dns":["8.8.8.8","1.1.1.1"]}"#).unwrap();
+        assert_eq!(old.dns_mode, DnsMode::Auto);
+        assert_eq!(old.upstreams().unwrap().len(), 2);
+        let manual: Settings = serde_json::from_str(
+            r#"{"dnsMode":"manual","dns":["tls://1.1.1.1"],"enforceDns":false}"#,
+        )
+        .unwrap();
+        assert_eq!(manual.dns_mode, DnsMode::Manual);
+        assert!(!manual.enforce_dns);
     }
 
     #[test]

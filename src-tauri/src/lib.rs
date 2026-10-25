@@ -149,7 +149,7 @@ mod tests {
         assert_eq!(
             updater["endpoints"],
             serde_json::json!([
-                "https://github.com/uditya-kumar/MultiPath/releases/latest/download/latest.json"
+                "https://github.com/shogorik/MultiPath-Hardened/releases/latest/download/latest.json"
             ])
         );
         // A minisign public key (base64 of its text form), never a secret key.
@@ -220,7 +220,7 @@ mod tests {
         let version = env!("CARGO_PKG_VERSION");
         assert_eq!(feed["version"], version);
         let base =
-            format!("https://github.com/uditya-kumar/MultiPath/releases/download/v{version}/");
+            format!("https://github.com/shogorik/MultiPath-Hardened/releases/download/v{version}/");
         let platforms = feed["platforms"].as_object().unwrap();
         assert!(!platforms.is_empty());
 

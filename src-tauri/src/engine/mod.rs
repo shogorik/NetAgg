@@ -4,6 +4,7 @@
 //! The engine owns the adapter, the capture routes and the relays. Keeping
 //! the link list fresh and probing health is the caller's job.
 
+mod dns;
 mod flows;
 mod gate;
 mod icmp;
@@ -31,15 +32,16 @@ pub use flows::{Flow, Flows};
 #[cfg(target_os = "macos")]
 pub use privileged::{run_helper, HELPER_ARG};
 
+use crate::net::dns::{Resolver, RESOLVER_V4};
 use crate::net::links::Links;
 use crate::net::router::{Proto, Router};
 #[cfg(target_os = "linux")]
 use crate::sys;
 #[cfg(target_os = "linux")]
 use crate::sys::LooseRpFilter;
-#[cfg(windows)]
-use crate::sys::PreferIpv4;
 use crate::sys::Route;
+#[cfg(windows)]
+use crate::sys::{DnsGuard, PreferIpv4};
 use flows::FlowGuard;
 
 /// Name of the virtual adapter MultiPath creates. macOS names every utun
@@ -72,8 +74,13 @@ const UDP_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 const TCP_WINDOW: usize = 256 * 1024;
 
 pub struct EngineConfig {
-    /// DNS servers set on the adapter, so lookups go through MultiPath too.
-    pub dns: Vec<IpAddr>,
+    /// Answers the lookups sent to the adapter, which is the DNS server the
+    /// OS is given.
+    pub resolver: Arc<Resolver>,
+    /// The user's servers are in force: queries to any other server are
+    /// answered by the resolver too, and on Windows blocked where they'd
+    /// go around the adapter.
+    pub enforce_dns: bool,
 }
 
 pub struct Engine {
@@ -85,6 +92,8 @@ pub struct Engine {
     tunnel: privileged::Tunnel,
     #[cfg(windows)]
     prefer_ipv4: Option<PreferIpv4>,
+    #[cfg(windows)]
+    dns_guard: Option<DnsGuard>,
     #[cfg(target_os = "linux")]
     loose_rp_filter: Option<LooseRpFilter>,
     stop: watch::Sender<bool>,
@@ -98,10 +107,17 @@ impl Engine {
         links: Arc<Links>,
         router: Arc<Router>,
     ) -> io::Result<Engine> {
+        let dns = vec![IpAddr::V4(RESOLVER_V4)];
         #[cfg(not(target_os = "macos"))]
-        let (device, routes) = open_adapter(config.dns).await?;
+        let (device, routes, _if_index) = open_adapter(dns).await?;
         #[cfg(target_os = "macos")]
-        let (device, tunnel) = privileged::open(config.dns).await?;
+        let (device, tunnel) = privileged::open(dns).await?;
+        // Fails closed: with the user's servers in force, no guard means no start.
+        #[cfg(windows)]
+        let dns_guard = match config.enforce_dns {
+            true => Some(DnsGuard::apply(_if_index)?),
+            false => None,
+        };
 
         // Sites with both families are reached over IPv4, which every
         // network has, so their connections can be spread across all of them.
@@ -120,8 +136,18 @@ impl Engine {
         let stack = IpStack::new(stack_config(), gate::Gate::new(device, router.clone()));
         let flows = Arc::new(Flows::default());
         let (stop, stopped) = watch::channel(false);
+        let intercept = Arc::new(dns::Intercept {
+            resolver: config.resolver,
+            enforce: config.enforce_dns,
+        });
         let tasks = vec![
-            tokio::spawn(accept(stack, router, flows.clone(), stopped.clone())),
+            tokio::spawn(accept(
+                stack,
+                router,
+                intercept,
+                flows.clone(),
+                stopped.clone(),
+            )),
             tokio::spawn(close_flows_on_lost_links(links, flows.clone(), stopped)),
         ];
         log::info!("engine started");
@@ -133,6 +159,8 @@ impl Engine {
             tunnel,
             #[cfg(windows)]
             prefer_ipv4,
+            #[cfg(windows)]
+            dns_guard,
             #[cfg(target_os = "linux")]
             loose_rp_filter,
             stop,
@@ -154,6 +182,9 @@ impl Engine {
         self.tunnel.close().await;
         #[cfg(windows)]
         drop(self.prefer_ipv4);
+        // After the routes: nothing leaks between the two.
+        #[cfg(windows)]
+        drop(self.dns_guard);
         #[cfg(target_os = "linux")]
         drop(self.loose_rp_filter);
         let _ = self.stop.send(true);
@@ -166,7 +197,7 @@ impl Engine {
 
 /// Creates the adapter, points its DNS at `dns` and adds the capture routes.
 #[cfg(not(target_os = "macos"))]
-async fn open_adapter(dns: Vec<IpAddr>) -> io::Result<(tun::AsyncDevice, Vec<Route>)> {
+async fn open_adapter(dns: Vec<IpAddr>) -> io::Result<(tun::AsyncDevice, Vec<Route>, u32)> {
     #[cfg(windows)]
     let wintun = wintun_path();
     #[cfg(windows)]
@@ -192,7 +223,7 @@ async fn open_adapter(dns: Vec<IpAddr>) -> io::Result<(tun::AsyncDevice, Vec<Rou
         log::info!("DNS stays with the system resolver: {err}");
     }
     log::info!("adapter up on interface {if_index}");
-    Ok((device, add_capture(if_index)?))
+    Ok((device, add_capture(if_index)?, if_index))
 }
 
 /// `wintun.dll` is installed in `resources/` next to the executable; in
@@ -329,13 +360,14 @@ async fn stopped(stop: &mut watch::Receiver<bool>) {
 async fn accept(
     mut stack: IpStack,
     router: Arc<Router>,
+    intercept: Arc<dns::Intercept>,
     flows: Arc<Flows>,
     mut stop: watch::Receiver<bool>,
 ) {
     loop {
         tokio::select! {
             stream = stack.accept() => match stream {
-                Ok(stream) => dispatch(stream, &router, &flows),
+                Ok(stream) => dispatch(stream, &router, &intercept, &flows),
                 Err(err) => {
                     log::error!("packet stack stopped: {err}");
                     break;
@@ -347,15 +379,28 @@ async fn accept(
     flows.abort_all();
 }
 
-fn dispatch(stream: IpStackStream, router: &Arc<Router>, flows: &Arc<Flows>) {
+fn dispatch(
+    stream: IpStackStream,
+    router: &Arc<Router>,
+    intercept: &dns::Intercept,
+    flows: &Arc<Flows>,
+) {
     match stream {
         IpStackStream::Tcp(tcp) => {
             let flow = flows.open(Proto::Tcp, tcp.local_addr(), tcp.peer_addr());
-            spawn_flow(flows, flow.clone(), tcp::handle(tcp, router.clone(), flow));
+            if intercept.takes(flow.dst) {
+                spawn_flow(flows, flow, dns::tcp(tcp, intercept.resolver.clone()));
+            } else {
+                spawn_flow(flows, flow.clone(), tcp::handle(tcp, router.clone(), flow));
+            }
         }
         IpStackStream::Udp(udp) => {
             let flow = flows.open(Proto::Udp, udp.local_addr(), udp.peer_addr());
-            spawn_flow(flows, flow.clone(), udp::handle(udp, router.clone(), flow));
+            if intercept.takes(flow.dst) {
+                spawn_flow(flows, flow, dns::udp(udp, intercept.resolver.clone()));
+            } else {
+                spawn_flow(flows, flow.clone(), udp::handle(udp, router.clone(), flow));
+            }
         }
         IpStackStream::UnknownTransport(packet) => {
             tokio::spawn(icmp::handle(packet, router.clone()));

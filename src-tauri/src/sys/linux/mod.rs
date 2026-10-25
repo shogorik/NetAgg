@@ -12,7 +12,7 @@ mod sockets;
 
 pub use adapters::{adapter_description, adapter_kind, has_connector};
 pub use clock::local_date;
-pub use dns::set_dns;
+pub use dns::{link_dns_servers, set_dns};
 pub use elevation::{can_elevate, elevates_in_place, is_elevated, relaunch_elevated};
 pub use icmp::icmp_echo;
 pub use instance::Instance;

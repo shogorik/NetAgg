@@ -12,6 +12,7 @@ use tokio::sync::watch;
 use super::settings::Settings;
 use super::usage::Usage;
 use crate::engine::{Engine, EngineConfig, Flows};
+use crate::net::dns::{DnsMode, Resolver};
 use crate::net::links::Links;
 use crate::net::router::Router;
 
@@ -103,10 +104,10 @@ impl AppState {
         }
         self.busy.store(true, Ordering::Relaxed);
         let settings = self.settings();
-        let config = EngineConfig {
-            dns: settings.dns.clone(),
+        let started = match self.engine_config(&settings) {
+            Ok(config) => Engine::start(config, self.links.clone(), self.router.clone()).await,
+            Err(err) => Err(err),
         };
-        let started = Engine::start(config, self.links.clone(), self.router.clone()).await;
         self.busy.store(false, Ordering::Relaxed);
         match started {
             Ok(started) => {
@@ -124,6 +125,20 @@ impl AppState {
                 Err(message)
             }
         }
+    }
+
+    fn engine_config(&self, settings: &Settings) -> std::io::Result<EngineConfig> {
+        let manual = settings.dns_mode == DnsMode::Manual;
+        let upstreams = if manual {
+            settings.upstreams().map_err(std::io::Error::other)?
+        } else {
+            Vec::new()
+        };
+        let resolver = Resolver::new(self.router.clone(), settings.dns_mode, upstreams)?;
+        Ok(EngineConfig {
+            resolver: Arc::new(resolver),
+            enforce_dns: manual && settings.enforce_dns,
+        })
     }
 
     /// Stops capturing. `remember` records that the user turned it off, so

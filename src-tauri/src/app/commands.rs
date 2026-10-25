@@ -1,7 +1,6 @@
 //! Commands the popup can invoke. Each change returns the new status, so
 //! the popup updates without waiting for the next tick.
 
-use std::net::IpAddr;
 use std::sync::atomic::Ordering;
 
 use serde::Deserialize;
@@ -12,6 +11,7 @@ use super::settings::LinkPrefs;
 use super::state::AppState;
 use super::status::{self, Connection, Status};
 use super::ticker;
+use crate::net::dns::{DnsMode, Upstream};
 use crate::sys;
 
 /// Passed to the elevated copy so it knows to wait for this one to exit.
@@ -94,19 +94,22 @@ pub struct OptionChange {
     pub adaptive: Option<bool>,
     pub sticky: Option<bool>,
     pub capture_ipv6: Option<bool>,
+    pub dns_mode: Option<DnsMode>,
     pub dns: Option<Vec<String>>,
+    pub enforce_dns: Option<bool>,
     pub start_on_login: Option<bool>,
     pub check_updates: Option<bool>,
     pub hide_unavailable: Option<bool>,
 }
 
-/// Parses DNS servers typed by the user; empty entries are skipped.
-fn parse_dns(servers: &[String]) -> Result<Vec<IpAddr>, String> {
+/// Checks DNS servers typed by the user and keeps them as typed (trimmed);
+/// empty entries are skipped.
+fn parse_dns(servers: &[String]) -> Result<Vec<String>, String> {
     servers
         .iter()
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
-        .map(|s| s.parse().map_err(|_| format!("{s} is not an IP address")))
+        .map(|s| Upstream::parse(s).map(|_| s.to_owned()))
         .collect()
 }
 
@@ -123,6 +126,10 @@ pub async fn set_option(app: AppHandle, change: OptionChange) -> Result<Status, 
     }
 
     let before = state.settings();
+    let manual_after = change.dns_mode.unwrap_or(before.dns_mode) == DnsMode::Manual;
+    if manual_after && dns.as_ref().unwrap_or(&before.dns).is_empty() {
+        return Err("Add your DNS servers first, then switch to them.".into());
+    }
     state.update_settings(|s| {
         if let Some(adaptive) = change.adaptive {
             s.adaptive = adaptive;
@@ -133,8 +140,14 @@ pub async fn set_option(app: AppHandle, change: OptionChange) -> Result<Status, 
         if let Some(capture_ipv6) = change.capture_ipv6 {
             s.capture_ipv6 = capture_ipv6;
         }
+        if let Some(dns_mode) = change.dns_mode {
+            s.dns_mode = dns_mode;
+        }
         if let Some(dns) = dns {
             s.dns = dns;
+        }
+        if let Some(enforce_dns) = change.enforce_dns {
+            s.enforce_dns = enforce_dns;
         }
         if let Some(check_updates) = change.check_updates {
             s.check_updates = check_updates;
@@ -144,8 +157,10 @@ pub async fn set_option(app: AppHandle, change: OptionChange) -> Result<Status, 
         }
     });
     let after = state.settings();
-    // The adapter's DNS servers are set when it's created.
-    if before.dns != after.dns {
+    // The resolver and the DNS guard are set up as the engine starts.
+    if (before.dns_mode, &before.dns, before.enforce_dns)
+        != (after.dns_mode, &after.dns, after.enforce_dns)
+    {
         state.restart().await?;
     }
     Ok(current(&app))
@@ -176,9 +191,20 @@ mod tests {
 
     #[test]
     fn dns_servers_are_checked() {
-        let typed = vec!["1.1.1.1".into(), " 2606:4700::1111 ".into(), "".into()];
-        assert_eq!(parse_dns(&typed).unwrap().len(), 2);
+        let typed = vec![
+            "1.1.1.1".into(),
+            " 2606:4700::1111 ".into(),
+            "".into(),
+            "tls://dns.quad9.net#9.9.9.9".into(),
+        ];
+        assert_eq!(
+            parse_dns(&typed).unwrap(),
+            ["1.1.1.1", "2606:4700::1111", "tls://dns.quad9.net#9.9.9.9"]
+        );
         assert!(parse_dns(&["dns.google".into()]).is_err());
+        assert!(parse_dns(&["https://dns.google/dns-query".into()]).is_err());
+        let change: OptionChange = serde_json::from_str(r#"{"dnsMode":"manual"}"#).unwrap();
+        assert_eq!(change.dns_mode, Some(DnsMode::Manual));
     }
 
     #[test]

@@ -13,3 +13,13 @@ pub fn has_connector(if_index: u32) -> bool {
     }
     row.InterfaceAndOperStatusFlags._bitfield & CONNECTOR_PRESENT != 0
 }
+
+/// The DNS servers Windows has for this adapter: from DHCP or router
+/// advertisements, or set by hand in its properties.
+pub fn link_dns_servers(if_index: u32) -> Vec<std::net::IpAddr> {
+    netdev::get_interfaces()
+        .into_iter()
+        .find(|itf| itf.index == if_index)
+        .map(|itf| itf.dns_servers)
+        .unwrap_or_default()
+}

@@ -8,7 +8,7 @@
 # from one machine to the next: each run adds its bundles, their .sig files and its entries in
 # latest.json (the feed the app reads from the latest release), and rewrites SHA256SUMS. A run
 # for a new version starts the feed over. Uploads nothing: attach every file in release-assets/
-# to the release tagged v<version> on uditya-kumar/MultiPath.
+# to the release tagged v<version> on shogorik/MultiPath-Hardened.
 #
 # Without a Mac, the macOS workflow (.github/workflows/macos.yml) builds the .app and .dmg, unsigned
 # for the updater. --macos-from takes its downloaded artifact instead of building, on any system:
@@ -17,13 +17,13 @@
 #   gh run download --name macos-bundle --dir macos-bundle
 #   scripts/release.sh --macos-from macos-bundle
 #
-# The updater key is read from MULTIPATH_UPDATER_KEY (default ~/.config/multipath/updater.key) by
+# The updater key is read from MULTIPATH_UPDATER_KEY (default ~/.config/multipath-hardened/updater.key) by
 # path; it is never printed, copied or put in the environment as text.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-REPO="uditya-kumar/MultiPath"
-KEY="${MULTIPATH_UPDATER_KEY:-$HOME/.config/multipath/updater.key}"
+REPO="shogorik/MultiPath-Hardened"
+KEY="${MULTIPATH_UPDATER_KEY:-$HOME/.config/multipath-hardened/updater.key}"
 MACOS_FROM=""
 if [[ "${1:-}" == "--macos-from" ]]; then
   MACOS_FROM="${2:?--macos-from needs the artifact directory}"

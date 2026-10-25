@@ -20,9 +20,11 @@ use super::elevation::wide;
 const MUTEX_NAME: &str = "Local\\MultiPath.Instance";
 const SHOW_EVENT_NAME: &str = "Local\\MultiPath.Show";
 
-/// Everyone gets full access, and the low integrity label lets a normal copy of
-/// the app reach objects created by an elevated one (and the other way round).
-const OPEN_TO_ALL_SDDL: &str = "D:(A;;GA;;;WD)S:(ML;;NW;;;LW)";
+/// Everyone in the session gets full access (`Local\` is per session), and a
+/// medium integrity label lets a normal copy of the app reach objects created
+/// by an elevated one, and the other way round. Medium, not low: sandboxed
+/// low integrity processes (browser renderers) can't take or signal them.
+const OPEN_TO_ALL_SDDL: &str = "D:(A;;GA;;;WD)S:(ML;;NW;;;ME)";
 
 struct Security {
     descriptor: PSECURITY_DESCRIPTOR,

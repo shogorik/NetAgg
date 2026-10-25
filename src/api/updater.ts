@@ -3,7 +3,7 @@ import { check, type DownloadEvent } from "@tauri-apps/plugin-updater";
 import { prepareUpdateInstall } from "./commands";
 
 /** Where people can always get MultiPath by hand. */
-export const RELEASES_PAGE = "github.com/uditya-kumar/MultiPath/releases";
+export const RELEASES_PAGE = "github.com/shogorik/MultiPath-Hardened/releases";
 
 /** How far a download has got. `total` is null when the server doesn't say. */
 export interface Progress {

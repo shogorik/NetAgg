@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use super::state::AppState;
 use crate::engine::{TUN_V4, TUN_V6};
+use crate::net::dns::DnsMode;
 use crate::net::links::HealthState;
 use crate::net::router::Proto;
 use crate::sys;
@@ -70,7 +71,9 @@ pub struct SettingsStatus {
     pub adaptive: bool,
     pub sticky: bool,
     pub capture_ipv6: bool,
+    pub dns_mode: DnsMode,
     pub dns: Vec<String>,
+    pub enforce_dns: bool,
     pub start_on_login: bool,
     pub check_updates: bool,
     pub hide_unavailable: bool,
@@ -202,7 +205,9 @@ pub fn build(state: &AppState) -> Status {
             adaptive: settings.adaptive,
             sticky: settings.sticky,
             capture_ipv6: settings.capture_ipv6,
-            dns: settings.dns.iter().map(|d| d.to_string()).collect(),
+            dns_mode: settings.dns_mode,
+            dns: settings.dns.clone(),
+            enforce_dns: settings.enforce_dns,
             start_on_login: state.start_on_login.load(Ordering::Relaxed),
             check_updates: settings.check_updates,
             hide_unavailable: settings.hide_unavailable,

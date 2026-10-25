@@ -73,6 +73,42 @@ fn set_script(interface: &str, servers: &[IpAddr]) -> String {
     )
 }
 
+/// The network's own DNS servers, from the resolvers `scutil --dns` scopes
+/// to its interface.
+pub fn link_dns_servers(if_index: u32) -> Vec<IpAddr> {
+    command::query(&Cmd::new(SCUTIL, &["--dns"]))
+        .map(|out| parse_scutil_dns(&out, if_index))
+        .unwrap_or_default()
+}
+
+/// Each `resolver #N` block lists `nameserver[i] : ip` lines and, when it
+/// belongs to one interface, `if_index : N (enX)`.
+fn parse_scutil_dns(out: &str, if_index: u32) -> Vec<IpAddr> {
+    let mut found = Vec::new();
+    for block in out.split("resolver #").skip(1) {
+        let field = |line: &str, key: &str| {
+            let (k, v) = line.split_once(':')?;
+            k.trim().starts_with(key).then(|| v.trim().to_owned())
+        };
+        let index = block.lines().find_map(|l| field(l, "if_index"));
+        let ours = index
+            .and_then(|v| v.split_whitespace().next()?.parse::<u32>().ok())
+            .is_some_and(|i| i == if_index);
+        if !ours {
+            continue;
+        }
+        for ip in block.lines().filter_map(|l| field(l, "nameserver")) {
+            // The resolver adds the scope back from the interface.
+            if let Ok(ip) = ip.split('%').next().unwrap_or_default().parse() {
+                if !found.contains(&ip) {
+                    found.push(ip);
+                }
+            }
+        }
+    }
+    found
+}
+
 fn show_script() -> String {
     format!("show {KEY}\nquit\n")
 }
@@ -87,6 +123,26 @@ fn is_present(shown: &str) -> bool {
 mod tests {
     use super::super::command::fake;
     use super::*;
+
+    #[test]
+    fn reads_an_interfaces_servers() {
+        let out = "DNS configuration\n\n\
+            resolver #1\n  search domain[0] : lan\n  nameserver[0] : 192.168.1.1\n  if_index : 6 (en0)\n  reach : 0x00020002\n\n\
+            resolver #2\n  domain   : local\n  options  : mdns\n\n\
+            DNS configuration (for scoped queries)\n\n\
+            resolver #1\n  nameserver[0] : 192.168.1.1\n  nameserver[1] : fe80::1%en0\n  if_index : 6 (en0)\n\n\
+            resolver #2\n  nameserver[0] : 172.20.10.1\n  if_index : 14 (en8)\n";
+        let servers: Vec<String> = parse_scutil_dns(out, 6)
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert_eq!(servers, ["192.168.1.1", "fe80::1"]);
+        assert_eq!(
+            parse_scutil_dns(out, 14),
+            ["172.20.10.1".parse::<IpAddr>().unwrap()]
+        );
+        assert!(parse_scutil_dns(out, 99).is_empty());
+    }
 
     #[test]
     fn writes_a_supplemental_resolver() {

@@ -24,6 +24,14 @@ etherparse = "0.20"
 log = "0.4"
 tauri-plugin-updater = "2.14.0"
 tauri-plugin-process = "2.4.0"
+# DNS-over-TLS and DNS-over-HTTPS upstreams. All already in the tree through the updater (ring, not aws-lc).
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+rustls-platform-verifier = "0.7"
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+url = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
@@ -31,10 +39,12 @@ windows-sys = { version = "0.61", features = [
     "Win32_Networking_WinSock",
     "Win32_NetworkManagement_IpHelper",
     "Win32_NetworkManagement_Ndis",
+    "Win32_NetworkManagement_WindowsFilteringPlatform",
     "Win32_Security",
     "Win32_Security_Authorization",
     "Win32_System_Threading",
     "Win32_System_IO",
+    "Win32_System_Rpc",
     "Win32_System_SystemInformation",
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",

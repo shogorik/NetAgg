@@ -2136,11 +2136,16 @@ version = "1.2.0"
 dependencies = [
  "base64 0.22.1",
  "etherparse",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
  "ipstack",
  "libc",
  "log",
  "minisign-verify",
  "netdev",
+ "rustls",
+ "rustls-platform-verifier",
  "serde",
  "serde_json",
  "socket2",
@@ -2149,7 +2154,9 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-updater",
  "tokio",
+ "tokio-rustls",
  "tun",
+ "url",
  "windows-sys 0.61.2",
 ]
 
@@ -3032,6 +3039,7 @@ version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",

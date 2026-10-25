@@ -43,10 +43,21 @@ mod scheduled_task {
                 (Ok(domain), Ok(name)) => format!("{domain}\\{name}"),
                 _ => return Err(io::Error::other("could not tell who is signed in")),
             };
-            let xml_path = std::env::temp_dir().join("multipath-task.xml");
-            write_utf16(&xml_path, &task_xml(&exe.to_string_lossy(), &user))?;
+            let xml_path = std::env::temp_dir().join(format!(
+                "multipath-task-{}-{}.xml",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |d| d.as_nanos())
+            ));
+            // %TEMP% is writable by everything the user runs. Held open with
+            // read-only sharing, the file can't be swapped or changed between
+            // writing it and the elevated schtasks reading it, so nothing
+            // else gets its own task registered with highest rights.
+            let held = write_utf16(&xml_path, &task_xml(&exe.to_string_lossy(), &user))?;
             let args = format!("/Create /TN {TASK_NAME} /XML \"{}\" /F", xml_path.display());
             let code = sys::run_elevated("schtasks", &args);
+            drop(held);
             let _ = std::fs::remove_file(&xml_path);
             code?
         } else {
@@ -62,12 +73,24 @@ mod scheduled_task {
     }
 
     /// `schtasks /XML` reads UTF-16 with a byte order mark most reliably.
-    fn write_utf16(path: &Path, text: &str) -> io::Result<()> {
+    /// Only creates a new file (never one planted at that name) and returns
+    /// it still open, shared for reading only.
+    fn write_utf16(path: &Path, text: &str) -> io::Result<std::fs::File> {
+        use std::io::Write;
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_SHARE_READ: u32 = 1;
         let bytes: Vec<u8> = std::iter::once(0xfeff)
             .chain(text.encode_utf16())
             .flat_map(u16::to_le_bytes)
             .collect();
-        std::fs::write(path, bytes)
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .share_mode(FILE_SHARE_READ)
+            .open(path)?;
+        file.write_all(&bytes)?;
+        file.flush()?;
+        Ok(file)
     }
 
     fn escape(s: &str) -> String {
@@ -120,6 +143,21 @@ mod scheduled_task {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        fn task_file_is_new_and_locked_while_held() {
+            let path =
+                std::env::temp_dir().join(format!("mp-task-test-{}.xml", std::process::id()));
+            let _ = std::fs::remove_file(&path);
+            let held = write_utf16(&path, "<Task/>").unwrap();
+            // Readable (schtasks), but not writable, deletable or replaceable.
+            assert!(std::fs::read(&path).unwrap().starts_with(&[0xff, 0xfe]));
+            assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
+            assert!(std::fs::remove_file(&path).is_err());
+            assert!(write_utf16(&path, "x").is_err());
+            drop(held);
+            std::fs::remove_file(&path).unwrap();
+        }
 
         #[test]
         fn task_runs_the_app_elevated_at_sign_in() {

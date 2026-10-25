@@ -19,7 +19,7 @@ pub use adapters::{adapter_kind, has_connector};
 pub use clock::local_date;
 #[cfg(test)]
 pub use command::fake;
-pub use dns::ResolverOverride;
+pub use dns::{link_dns_servers, ResolverOverride};
 pub use elevation::{
     can_elevate, elevates_in_place, is_elevated, relaunch_elevated, run_with_admin_prompt,
 };
