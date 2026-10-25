@@ -24,6 +24,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="shogorik/NetAgg"
 KEY="${NETAGG_UPDATER_KEY:-$HOME/.config/netagg/updater.key}"
+# Windows Authenticode: the thumbprint of a code-signing certificate in the user's certificate
+# store (self-signed is fine for PCs that trust it). Without the file, nothing is Authenticode-signed.
+THUMBPRINT_FILE="${NETAGG_CODESIGN_THUMBPRINT:-$HOME/.config/netagg/codesign.thumbprint}"
 MACOS_FROM=""
 if [[ "${1:-}" == "--macos-from" ]]; then
   MACOS_FROM="${2:?--macos-from needs the artifact directory}"
@@ -76,6 +79,11 @@ case "$(uname -s)" in
     )
     # tauri is a Windows program: give it Windows paths.
     NATIVE_PATHS=1
+    if [[ -f "$THUMBPRINT_FILE" ]]; then
+      THUMBPRINT="$(tr -d '\r\n ' < "$THUMBPRINT_FILE")"
+      [[ "$THUMBPRINT" =~ ^[0-9A-Fa-f]{40}$ ]] || die "$THUMBPRINT_FILE isn't a certificate thumbprint"
+      SIGN_CONFIG=",\"windows\":{\"certificateThumbprint\":\"$THUMBPRINT\",\"digestAlgorithm\":\"sha256\",\"timestampUrl\":\"http://timestamp.digicert.com\"}"
+    fi
     KEY="$(cygpath -w "$KEY")"
     ;;
   *) die "unsupported system $(uname -s)" ;;
@@ -97,7 +105,7 @@ else
   # `tauri build` takes a key file's path in TAURI_SIGNING_PRIVATE_KEY (it ignores _PATH). The
   # .sig files are only made here, so a plain `npm run tauri build` works without the key.
   CI=true TAURI_SIGNING_PRIVATE_KEY="$KEY" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" \
-    npx tauri build --target "$TARGET" --config '{"bundle":{"createUpdaterArtifacts":true}}'
+    npx tauri build --target "$TARGET" --config "{\"bundle\":{\"createUpdaterArtifacts\":true${SIGN_CONFIG:-}}}"
 fi
 
 mkdir -p "$OUT"
