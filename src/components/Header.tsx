@@ -9,7 +9,7 @@ interface Props {
   dot: string;
   disabled: boolean;
   onToggle: (on: boolean) => void;
-  onMinimize: () => void;
+  onMinimize?: () => void;
 }
 
 /** The main header: app mark, status line, the master switch and minimize. */
@@ -27,7 +27,7 @@ export function Header({ on, status, dot, disabled, onToggle, onMinimize }: Prop
         </span>
       </div>
       <Toggle on={on} label="NetAgg" disabled={disabled} onChange={onToggle} />
-      <IconButton icon={Minus} label="Minimize" onClick={onMinimize} />
+      {onMinimize && <IconButton icon={Minus} label="Minimize" onClick={onMinimize} />}
     </header>
   );
 }
@@ -35,7 +35,7 @@ export function Header({ on, status, dot, disabled, onToggle, onMinimize }: Prop
 interface SubProps {
   title: string;
   onBack: () => void;
-  onMinimize: () => void;
+  onMinimize?: () => void;
   children?: ReactNode;
 }
 
@@ -47,7 +47,7 @@ export function SubHeader({ title, onBack, onMinimize, children }: SubProps) {
       <span className="header-title">{title}</span>
       {children}
       <span className="header-spacer" />
-      <IconButton icon={Minus} label="Minimize" onClick={onMinimize} />
+      {onMinimize && <IconButton icon={Minus} label="Minimize" onClick={onMinimize} />}
     </header>
   );
 }

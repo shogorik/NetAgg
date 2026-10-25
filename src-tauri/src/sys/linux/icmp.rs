@@ -114,6 +114,19 @@ fn echo_reply(icmp: &[u8], id: Option<u16>, seq: u16) -> Option<&[u8]> {
     (id_matches && icmp[6..8] == seq.to_be_bytes()).then(|| &icmp[8..])
 }
 
+/// Which router answers `ttl` hops along `source`'s path.
+/// shortcut: not implemented here (needs ICMP time-exceeded from an
+/// unprivileged socket); the shared-line check then finds nothing. Upgrade
+/// with IP_RECVERR (Linux) or a raw socket (root, macOS) when needed.
+pub fn icmp_hop(
+    _source: std::net::Ipv4Addr,
+    _dest: std::net::Ipv4Addr,
+    _ttl: u8,
+    _timeout_ms: u32,
+) -> Option<std::net::Ipv4Addr> {
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,17 +167,4 @@ mod tests {
         assert_eq!(strip_ip_header(&packet, from), Some(&packet[20..]));
         assert_eq!(strip_ip_header(&packet, Ipv4Addr::new(8, 8, 8, 8)), None);
     }
-}
-
-/// Which router answers `ttl` hops along `source`'s path.
-/// shortcut: not implemented here (needs ICMP time-exceeded from an
-/// unprivileged socket); the shared-line check then finds nothing. Upgrade
-/// with IP_RECVERR (Linux) or a raw socket (root, macOS) when needed.
-pub fn icmp_hop(
-    _source: std::net::Ipv4Addr,
-    _dest: std::net::Ipv4Addr,
-    _ttl: u8,
-    _timeout_ms: u32,
-) -> Option<std::net::Ipv4Addr> {
-    None
 }

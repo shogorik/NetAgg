@@ -863,3 +863,21 @@ button.setting-row:hover {
   font-size: 12px;
   text-align: center;
 }
+
+/* netagg-server's WebUI: the popup as a card in the middle of a browser page. */
+html.web,
+html.web body {
+  background: #1c1c1c;
+  overflow: auto;
+}
+
+html.web #root {
+  width: min(360px, 100vw);
+  margin: 24px auto;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+html.web .popup {
+  width: 100%;
+}

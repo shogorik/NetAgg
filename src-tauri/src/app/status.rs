@@ -5,6 +5,7 @@ use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use serde::Serialize;
+#[cfg(feature = "gui")]
 use serde_json::Value;
 
 use super::settings::Settings;
@@ -276,6 +277,7 @@ fn settings_status(settings: &Settings) -> SettingsStatus {
 
 /// What the popup shows when the engine can't be asked (Windows: the
 /// service isn't running), with the reason as the error.
+#[cfg(feature = "gui")]
 pub fn offline(error: String) -> Status {
     Status {
         platform: std::env::consts::OS,
@@ -317,6 +319,7 @@ fn drops_wifi(links: &[LinkStatus]) -> bool {
 
 /// The text shown when hovering over the tray icon, from a status as sent
 /// to the popup.
+#[cfg(feature = "gui")]
 pub fn tooltip(status: &Value) -> String {
     if status["on"] != true {
         return "NetAgg — off".into();

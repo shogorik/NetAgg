@@ -1,3 +1,6 @@
+// netagg-server has no popup to show, only the single-instance check.
+#![cfg_attr(not(feature = "gui"), allow(dead_code))]
+
 use std::fs;
 use std::io::{self, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};

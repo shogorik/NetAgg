@@ -241,10 +241,10 @@ impl AppState {
     }
 
     /// Points the OS default route at the chosen (or automatically picked)
-    /// network. Windows only, and only with administrator rights; otherwise
+    /// network (not macOS), and only with administrator rights; otherwise
     /// the choice waits for a run that has them.
     pub fn apply_default_route(&self) {
-        #[cfg(windows)]
+        #[cfg(not(target_os = "macos"))]
         {
             if !crate::sys::is_elevated() {
                 return;
@@ -252,11 +252,15 @@ impl AppState {
             let chosen = self.settings().default_link;
             let target = self.links.preferred_default(chosen.as_deref());
             let code = target.unwrap_or(0);
-            if self.default_applied.swap(code, Ordering::Relaxed) == code {
+            // Linux: NetworkManager may drop a route it didn't add, so the
+            // choice is checked again each time (it's idempotent).
+            let changed = self.default_applied.swap(code, Ordering::Relaxed) != code;
+            if !changed && cfg!(windows) {
                 return;
             }
             match crate::sys::prefer_interface(target) {
-                Ok(()) => log::info!("default route: {target:?}"),
+                Ok(()) if changed => log::info!("default route: {target:?}"),
+                Ok(()) => {}
                 Err(err) => {
                     log::warn!("couldn't set the default route: {err}");
                     // Try again on the next refresh.

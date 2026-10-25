@@ -9,12 +9,11 @@ use super::state::AppState;
 use super::status;
 
 pub enum Backend {
-    /// In this process (Linux, macOS), which has the rights it needs or
-    /// asks for them.
-    #[cfg_attr(windows, allow(dead_code))]
+    /// In this process (macOS), which asks for the rights it needs.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     Local(Arc<AppState>),
-    /// In the NetAgg service (Windows); this process runs as the user.
-    #[cfg(windows)]
+    /// In the NetAgg service (Windows, Linux); this process runs as the user.
+    #[cfg(not(target_os = "macos"))]
     Service,
 }
 
@@ -25,7 +24,7 @@ impl Backend {
             Backend::Local(state) => {
                 control::handle(state, request, Caller { elevated: true }).await
             }
-            #[cfg(windows)]
+            #[cfg(not(target_os = "macos"))]
             Backend::Service => super::service::call(request).await,
         }
     }
@@ -41,7 +40,7 @@ impl Backend {
     pub fn local(&self) -> Option<&Arc<AppState>> {
         match self {
             Backend::Local(state) => Some(state),
-            #[cfg(windows)]
+            #[cfg(not(target_os = "macos"))]
             Backend::Service => None,
         }
     }

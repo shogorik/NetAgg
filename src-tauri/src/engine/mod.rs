@@ -37,11 +37,13 @@ use crate::net::links::Links;
 use crate::net::router::{Proto, Router};
 #[cfg(target_os = "linux")]
 use crate::sys;
+#[cfg(not(target_os = "macos"))]
+use crate::sys::DnsGuard;
 #[cfg(target_os = "linux")]
 use crate::sys::LooseRpFilter;
-use crate::sys::Route;
 #[cfg(windows)]
-use crate::sys::{DnsGuard, PreferIpv4};
+use crate::sys::PreferIpv4;
+use crate::sys::Route;
 use flows::FlowGuard;
 
 /// Name of the virtual adapter NetAgg creates. macOS names every utun
@@ -92,7 +94,7 @@ pub struct Engine {
     tunnel: privileged::Tunnel,
     #[cfg(windows)]
     prefer_ipv4: Option<PreferIpv4>,
-    #[cfg(windows)]
+    #[cfg(not(target_os = "macos"))]
     dns_guard: Option<DnsGuard>,
     #[cfg(target_os = "linux")]
     loose_rp_filter: Option<LooseRpFilter>,
@@ -113,7 +115,7 @@ impl Engine {
         #[cfg(target_os = "macos")]
         let (device, tunnel) = privileged::open(dns).await?;
         // Fails closed: with the user's servers in force, no guard means no start.
-        #[cfg(windows)]
+        #[cfg(not(target_os = "macos"))]
         let dns_guard = match config.enforce_dns {
             true => Some(DnsGuard::apply(_if_index)?),
             false => None,
@@ -159,7 +161,7 @@ impl Engine {
             tunnel,
             #[cfg(windows)]
             prefer_ipv4,
-            #[cfg(windows)]
+            #[cfg(not(target_os = "macos"))]
             dns_guard,
             #[cfg(target_os = "linux")]
             loose_rp_filter,
@@ -183,7 +185,7 @@ impl Engine {
         #[cfg(windows)]
         drop(self.prefer_ipv4);
         // After the routes: nothing leaks between the two.
-        #[cfg(windows)]
+        #[cfg(not(target_os = "macos"))]
         drop(self.dns_guard);
         #[cfg(target_os = "linux")]
         drop(self.loose_rp_filter);
@@ -341,6 +343,10 @@ pub fn clean_up_stale() {
     #[cfg(target_os = "macos")]
     if crate::sys::ResolverOverride::remove_stale() {
         log::info!("removed stale DNS servers");
+    }
+    #[cfg(target_os = "linux")]
+    if DnsGuard::remove_stale() {
+        log::info!("removed a stale DNS block");
     }
     let Some(adapter) = netdev::get_interfaces().into_iter().find(is_tun) else {
         return;

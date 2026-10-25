@@ -8,6 +8,7 @@ import {
 } from "react";
 import { ChevronRight } from "lucide-react";
 import { errorText, setDefaultLink, setLinkLabel, setLinkWeight, setOption } from "../api/commands";
+import { inBrowser } from "../api/transport";
 import type { LinkStatus, OptionChange, Status } from "../api/types";
 import { hidePopup } from "../api/window";
 import { SubHeader } from "../components/Header";
@@ -120,11 +121,13 @@ export function Settings({ status, onStatus, onBack, update }: Props) {
 
         <div className="divider" />
         <Section title="App">
-          <SwitchRow
-            label={startAtLoginLabel(status)}
-            on={settings.startOnLogin}
-            onChange={(startOnLogin) => change({ startOnLogin })}
-          />
+          {!inBrowser && (
+            <SwitchRow
+              label={startAtLoginLabel(status)}
+              on={settings.startOnLogin}
+              onChange={(startOnLogin) => change({ startOnLogin })}
+            />
+          )}
           <SwitchRow
             label="Hide unavailable networks"
             desc="Leaves unplugged cables and networks that aren't connected out of the list."
@@ -153,19 +156,40 @@ export function Settings({ status, onStatus, onBack, update }: Props) {
         </Section>
 
         <div className="divider" />
-        <Section title="Updates">
-          <UpdatePanel status={status} update={update} />
-          <SwitchRow
-            label="Check for updates at start"
-            desc="Asks GitHub for a newer version when NetAgg opens. Never installs without asking."
-            on={settings.checkUpdates}
-            onChange={(checkUpdates) => change({ checkUpdates })}
-          />
-        </Section>
+        {inBrowser ? (
+          <Section title="WebUI">
+            <div className="setting-row">
+              <div className="setting-text">
+                <span className="setting-label">Signed in</span>
+                <span className="setting-desc">
+                  Updates come with the netagg-server package: install the newer .deb on the server.
+                </span>
+              </div>
+              <button type="button" className="secondary-button" onClick={signOut}>
+                Sign out
+              </button>
+            </div>
+          </Section>
+        ) : (
+          <Section title="Updates">
+            <UpdatePanel status={status} update={update} />
+            <SwitchRow
+              label="Check for updates at start"
+              desc="Asks GitHub for a newer version when NetAgg opens. Never installs without asking."
+              on={settings.checkUpdates}
+              onChange={(checkUpdates) => change({ checkUpdates })}
+            />
+          </Section>
+        )}
         <div className="bottom-spacer" />
       </div>
     </>
   );
+}
+
+/** Ends this browser's WebUI session. */
+function signOut() {
+  void fetch("/logout", { method: "POST" }).finally(() => window.location.assign("/login"));
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {

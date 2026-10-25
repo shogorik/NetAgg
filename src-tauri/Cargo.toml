@@ -8,11 +8,30 @@ license = "MIT"
 name = "netagg_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# Two programs from one library: the desktop app (tray and popup, Tauri) and,
+# for headless Linux servers, netagg-server (the service and its WebUI), which
+# needs neither Tauri nor GTK/WebKit. Build it with
+# `cargo build --release --no-default-features --features server`.
+[[bin]]
+name = "netagg"
+path = "src/main.rs"
+required-features = ["gui"]
+
+[[bin]]
+name = "netagg-server"
+path = "src/bin/netagg-server.rs"
+required-features = ["server"]
+
+[features]
+default = ["gui"]
+gui = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-updater", "dep:tauri-plugin-process"]
+server = ["dep:argon2", "dep:rcgen", "hyper/server"]
+
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2", features = [], optional = true }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
@@ -22,9 +41,9 @@ netdev = "0.46"
 socket2 = { version = "0.6", features = ["all"] }
 etherparse = "0.20"
 log = { version = "0.4", features = ["std"] }
-tauri-plugin-updater = "2.14.0"
-tauri-plugin-process = "2.4.0"
-# DNS-over-TLS and DNS-over-HTTPS upstreams. All already in the tree through the updater (ring, not aws-lc).
+tauri-plugin-updater = { version = "2.14.0", optional = true }
+tauri-plugin-process = { version = "2.4.0", optional = true }
+# DNS-over-TLS and DNS-over-HTTPS upstreams (ring, not aws-lc; the updater uses the same).
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 rustls-platform-verifier = "0.7"
@@ -32,6 +51,9 @@ hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
 http-body-util = "0.1"
 url = "2"
+# netagg-server's WebUI: the password's hash, and its self-signed certificate.
+argon2 = { version = "0.6.0", optional = true }
+rcgen = { version = "0.14.10", default-features = false, features = ["crypto", "ring", "pem"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [

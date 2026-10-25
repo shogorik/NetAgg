@@ -165,8 +165,16 @@ Everything is on the [latest release](https://github.com/shogorik/NetAgg/release
 
 ### Linux: coming soon
 
-The Linux code is in this repository, but no Linux package has been released yet. It will come as a `.deb` (Debian,
-Ubuntu and the like) and an AppImage, once it has been tested with the current version.
+No Linux package has been released yet. Linux will get the same NetAgg as Windows, as two packages for Ubuntu 24.04
+and newer:
+
+- **`net-agg` for Ubuntu Desktop:** the tray icon and popup, with the engine in a background service. Changing DNS
+  settings asks for your password, as Windows asks for administrator approval.
+- **`netagg-server` for headless servers:** the same service, plus a WebUI (the popup in your browser) at
+  `https://<server>:8443`. It answers only your local network and Tailscale. Set its password on the server with
+  `sudo netagg-server webui-password`; running it again sets a new one if you forget it.
+
+Both are built and pass their lab tests; they'll be released once they've been tested on real networks.
 
 ### macOS: not for now
 

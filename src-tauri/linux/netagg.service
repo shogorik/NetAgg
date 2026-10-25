@@ -1,0 +1,43 @@
+[Unit]
+Description=NetAgg: spreads connections across your networks
+Documentation=https://github.com/shogorik/NetAgg
+After=network-pre.target NetworkManager.service systemd-networkd.service systemd-resolved.service
+Wants=network-pre.target
+
+[Service]
+Type=exec
+# netagg-server's copy runs /usr/bin/netagg-server instead (see scripts/build-server-deb.sh).
+ExecStart=/usr/bin/netagg --service
+# Removes what a crash left behind: the DNS block outlives the process.
+ExecStopPost=/usr/bin/netagg --clean-up
+Restart=on-failure
+RestartSec=5
+# Settings, usage and the log; the control socket.
+StateDirectory=netagg
+StateDirectoryMode=0755
+RuntimeDirectory=netagg
+RuntimeDirectoryMode=0755
+
+# Root, for systemd-resolved's DNS settings, but with only what the engine needs:
+# the adapter, routes and nftables (NET_ADMIN), pinned and ICMP sockets (NET_RAW).
+# No CAP_DAC_OVERRIDE or CAP_SYS_PTRACE: it can't read other users' files or
+# processes, so the Connections list names only root's programs.
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { appUpdater } from "./api/updater";
+import { inBrowser } from "./api/transport";
 import { useStatus } from "./api/useStatus";
 import { hidePopup, useFitWindow } from "./api/window";
 import { useUpdater } from "./lib/useUpdater";
@@ -15,13 +16,14 @@ export default function App() {
   const [view, setView] = useState<View>("main");
   // Settings is taller than the main page; it keeps the main page's height and scrolls instead.
   const [homeHeight, setHomeHeight] = useState<number | null>(null);
-  const update = useUpdater(appUpdater, status ? status.settings.checkUpdates : null);
+  // A server's WebUI is updated with its package, not from the page.
+  const update = useUpdater(appUpdater, status && !inBrowser ? status.settings.checkUpdates : null);
 
   // Esc goes back a page, and from the first page hides the popup.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (view === "main") void hidePopup();
+      if (view === "main") void hidePopup?.();
       else setView("main");
     };
     window.addEventListener("keydown", onKey);

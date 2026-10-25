@@ -177,10 +177,10 @@ async fn switch(state: &AppState, on: bool, remember: bool) -> Result<(), String
 }
 
 /// Refuses to run with administrator rights from a folder, or with
-/// settings, that other programs could change (Windows). Debug builds run
+/// settings, that other programs could change (Windows, Linux). Debug builds run
 /// from the source tree, so they only warn.
 pub fn install_secure() -> Result<(), String> {
-    #[cfg(windows)]
+    #[cfg(not(target_os = "macos"))]
     if let Err(err) = sys::check_install_secure() {
         if cfg!(debug_assertions) {
             log::warn!("{err}");

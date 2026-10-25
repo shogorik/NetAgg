@@ -1,21 +1,30 @@
 //! The Tauri side: the popup's commands, the ticker and the tray, which ask
 //! the engine through a backend: shared state in this process, or the
-//! Windows service. Also the engine's side of those requests (`control`),
+//! NetAgg service. Also the engine's side of those requests (`control`),
 //! the service itself, and the headless runner, which drives the same state
-//! without Tauri.
+//! without Tauri. The Tauri parts are only in the desktop app (`gui`).
 
+#[cfg(feature = "gui")]
 pub mod autostart;
+#[cfg(feature = "gui")]
 pub mod backend;
+#[cfg(feature = "gui")]
 pub mod commands;
 pub mod control;
 pub mod headless;
 pub mod logfile;
+#[cfg(feature = "gui")]
 pub mod popup;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 pub mod service;
 pub mod settings;
 pub mod state;
 pub mod status;
+#[cfg(feature = "gui")]
 pub mod ticker;
+pub mod ticks;
+#[cfg(feature = "gui")]
 pub mod tray;
 pub mod usage;
+#[cfg(all(feature = "server", target_os = "linux"))]
+pub mod webui;

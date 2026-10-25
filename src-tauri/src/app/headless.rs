@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use super::state::AppState;
 use super::status;
-use super::ticker::Ticks;
+use super::ticks::Ticks;
 use crate::net::health;
 use crate::{engine, sys};
 
@@ -119,7 +119,7 @@ fn config_dir() -> Option<PathBuf> {
     Some(base?.join(IDENTIFIER))
 }
 
-async fn shutdown_requested() {
+pub async fn shutdown_requested() {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{signal, SignalKind};
@@ -135,7 +135,7 @@ async fn shutdown_requested() {
 }
 
 /// Engine and health messages go to stderr, keeping stdout for the status.
-struct StderrLog;
+pub struct StderrLog;
 
 impl log::Log for StderrLog {
     fn enabled(&self, metadata: &log::Metadata) -> bool {

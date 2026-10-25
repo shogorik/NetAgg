@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getStatus } from "./commands";
+import { inBrowser } from "./transport";
 import type { Status } from "./types";
 
 /**
  * The latest status: fetched when the popup opens, then pushed by the
- * backend's ticker once a second while it stays open.
+ * backend's ticker once a second while it stays open (in a browser, asked
+ * for once a second).
  */
 export function useStatus(): [Status | null, (status: Status) => void] {
   const [status, setStatus] = useState<Status | null>(null);
@@ -17,7 +19,9 @@ export function useStatus(): [Status | null, (status: Status) => void] {
         .then((s) => alive && setStatus(s))
         .catch(() => {});
     refresh();
-    const unlisten = listen<Status>("status", (e) => alive && setStatus(e.payload));
+    const unlisten = inBrowser
+      ? Promise.resolve(((timer) => () => clearInterval(timer))(setInterval(refresh, 1000)))
+      : listen<Status>("status", (e) => alive && setStatus(e.payload));
     // The popup is hidden, not closed, so catch up whenever it's shown again.
     window.addEventListener("focus", refresh);
     return () => {
