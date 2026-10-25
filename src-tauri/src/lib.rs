@@ -9,7 +9,7 @@ use std::time::Duration;
 use tauri::{Manager, RunEvent, WindowEvent};
 
 use app::state::AppState;
-use app::{autostart, commands, headless, popup, ticker, tray};
+use app::{autostart, commands, headless, logfile, popup, ticker, tray};
 
 pub fn run() {
     let has_arg = |arg: &str| std::env::args().any(|a| a == arg);
@@ -73,6 +73,14 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let elevated = sys::is_elevated();
+            if let Ok(dir) = app.path().app_local_data_dir() {
+                logfile::init(&dir);
+            }
+            log::info!(
+                "NetAgg {} started from {:?}, elevated: {elevated}",
+                env!("CARGO_PKG_VERSION"),
+                std::env::current_exe().ok()
+            );
             if elevated {
                 engine::clean_up_stale();
             }

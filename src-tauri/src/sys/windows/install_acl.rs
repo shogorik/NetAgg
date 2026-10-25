@@ -187,8 +187,17 @@ mod tests {
     fn installed_acl() {
         let user = current_user_sid().unwrap();
         let dir = PathBuf::from(std::env::var("NETAGG_DIR").unwrap());
-        for path in [dir.clone(), dir.join("netagg.exe"), dir.join("resources"), dir.join("resources/wintun.dll")] {
-            println!("{}: changeable by users = {}", path.display(), changeable_by_users(&path, &user.0).unwrap());
+        for path in [
+            dir.clone(),
+            dir.join("netagg.exe"),
+            dir.join("resources"),
+            dir.join("resources/wintun.dll"),
+        ] {
+            println!(
+                "{}: changeable by users = {}",
+                path.display(),
+                changeable_by_users(&path, &user.0).unwrap()
+            );
         }
     }
 

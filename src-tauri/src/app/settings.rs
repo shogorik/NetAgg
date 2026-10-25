@@ -106,23 +106,34 @@ impl Settings {
         self.dns.iter().map(|s| Upstream::parse(s)).collect()
     }
 
+    /// Defaults when there's no file yet; anything else that goes wrong is
+    /// logged, since the defaults then quietly replace the user's choices.
     pub fn load(path: &PathBuf) -> Settings {
-        std::fs::read(path)
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default()
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Settings::default(),
+            Err(err) => {
+                log::warn!("couldn't read {}: {err}", path.display());
+                return Settings::default();
+            }
+        };
+        serde_json::from_slice(&bytes).unwrap_or_else(|err| {
+            log::warn!("couldn't parse {}: {err}", path.display());
+            Settings::default()
+        })
     }
 
     pub fn save(&self, path: &PathBuf) {
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        if let Ok(json) = serde_json::to_vec_pretty(self) {
-            // Write then rename so a crash never leaves half a file.
-            let tmp = path.with_extension("json.tmp");
-            if std::fs::write(&tmp, json).is_ok() {
-                let _ = std::fs::rename(&tmp, path);
-            }
+        let Ok(json) = serde_json::to_vec_pretty(self) else {
+            return;
+        };
+        // Write then rename so a crash never leaves half a file.
+        let tmp = path.with_extension("json.tmp");
+        if let Err(err) = std::fs::write(&tmp, json).and_then(|()| std::fs::rename(&tmp, path)) {
+            log::warn!("couldn't save {}: {err}", path.display());
         }
     }
 }

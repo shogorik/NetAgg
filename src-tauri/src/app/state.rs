@@ -138,6 +138,12 @@ impl AppState {
         let settings_path = config_dir.join("settings.json");
         let usage_path = config_dir.join("usage.json");
         let settings = Settings::load(&settings_path);
+        log::info!(
+            "settings: {} (exists: {}), dns {:?}",
+            settings_path.display(),
+            settings_path.exists(),
+            settings.dns_mode
+        );
         let links = Arc::new(Links::default());
         links.refresh();
         let router = Arc::new(Router::new(links.clone(), settings.policy()));

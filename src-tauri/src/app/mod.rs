@@ -5,6 +5,7 @@
 pub mod autostart;
 pub mod commands;
 pub mod headless;
+pub mod logfile;
 pub mod popup;
 pub mod settings;
 pub mod state;
