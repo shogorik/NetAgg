@@ -62,6 +62,8 @@ pub struct LinkStatus {
     pub is_default: bool,
     /// What the OS calls it, for the rename editor.
     pub os_name: String,
+    /// Bytes it has carried for NetAgg, down and up, since NetAgg started.
+    pub total_bytes: u64,
     pub enabled: bool,
     pub weight: u32,
     pub rx_rate: u64,
@@ -165,6 +167,8 @@ pub fn build(state: &AppState) -> Status {
                 id: link.id.clone(),
                 name: prefs.label.clone().unwrap_or_else(|| info.display_name()),
                 os_name: info.name.clone(),
+                total_bytes: link.stats.rx.load(Ordering::Relaxed)
+                    + link.stats.tx.load(Ordering::Relaxed),
                 description: info.description,
                 kind: info.kind,
                 address: info

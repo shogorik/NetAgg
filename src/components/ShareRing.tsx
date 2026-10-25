@@ -1,6 +1,6 @@
 import { ArrowUp } from "lucide-react";
 import type { LinkStatus } from "../api/types";
-import { formatRate, ringSegments, scaleRate } from "../lib/format";
+import { formatBytes, formatRate, ringSegments, scaleRate } from "../lib/format";
 import { useSmoothed } from "../lib/useSmoothed";
 
 const SIZE = 120;
@@ -63,7 +63,10 @@ export function ShareRing({ links, colors, rxRate, txRate }: Props) {
           <div key={link.id} className="legend-item">
             <span className="legend-label">
               <span className="dot" style={{ background: colors.get(link.id) }} />
-              {link.name}
+              <span className="legend-name">{link.name}</span>
+              <span className="legend-total" title="Carried since NetAgg started, down and up">
+                {formatBytes(link.totalBytes)}
+              </span>
             </span>
             <span className="legend-value">
               <span className="legend-rate">{formatRate(link.rxRate)}</span>

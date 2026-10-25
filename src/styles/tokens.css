@@ -9,6 +9,8 @@
   --text-2: #c8c8c8;
   --text-3: #8e8e8e;
   --accent: #4cc2ff;
+  /* NetAgg's own colour: the app icon and the header mark. */
+  --brand: #2fc6a0;
   --on-accent: #000000;
   --ok: #6ccb5f;
   --warn: #fce100;

@@ -17,6 +17,8 @@ export interface LinkStatus {
   isDefault: boolean;
   /** What the system calls it, shown when renaming. */
   osName: string;
+  /** Bytes carried for NetAgg, down and up, since it started. */
+  totalBytes: number;
   enabled: boolean;
   weight: number;
   /** Bytes per second. */

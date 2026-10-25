@@ -154,7 +154,7 @@ button.chip:hover {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-lg);
-  background: var(--accent);
+  background: var(--brand);
   color: var(--on-accent);
   display: flex;
   align-items: center;
@@ -333,6 +333,18 @@ button.chip:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.legend-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.legend-total {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .legend-value {

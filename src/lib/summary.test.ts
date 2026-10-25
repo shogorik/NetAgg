@@ -15,6 +15,7 @@ const wifi: LinkStatus = {
   present: true,
   isDefault: true,
   osName: "Wi-Fi",
+  totalBytes: 0,
   enabled: true,
   weight: 5,
   rxRate: 0,

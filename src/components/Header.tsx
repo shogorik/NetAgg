@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronLeft, Minus, Waypoints } from "lucide-react";
+import { ChevronLeft, Minus, Network } from "lucide-react";
 import { IconButton } from "./IconButton";
 import { Toggle } from "./Toggle";
 
@@ -17,7 +17,7 @@ export function Header({ on, status, dot, disabled, onToggle, onMinimize }: Prop
   return (
     <header className="header">
       <span className="app-mark">
-        <Waypoints size={18} />
+        <Network size={18} />
       </span>
       <div className="title-block">
         <span className="app-name">NetAgg</span>
