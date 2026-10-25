@@ -1,4 +1,4 @@
-//! Start MultiPath when the user signs in, quietly in the tray.
+//! Start NetAgg when the user signs in, quietly in the tray.
 
 #[cfg(target_os = "linux")]
 pub use desktop_entry::{is_enabled, set_enabled};
@@ -7,10 +7,10 @@ pub use launch_agent::{is_enabled, set_enabled};
 #[cfg(windows)]
 pub use scheduled_task::{is_enabled, set_enabled};
 
-/// Tells MultiPath it was started at sign-in, so it stays in the tray.
+/// Tells NetAgg it was started at sign-in, so it stays in the tray.
 pub const AUTOSTART_ARG: &str = "--autostart";
 
-/// MultiPath needs administrator rights, which a Run key can't give without
+/// NetAgg needs administrator rights, which a Run key can't give without
 /// a UAC prompt at every sign-in, so it registers a scheduled task that runs
 /// with highest privileges instead.
 #[cfg(windows)]
@@ -23,7 +23,7 @@ mod scheduled_task {
     use super::AUTOSTART_ARG;
     use crate::sys;
 
-    const TASK_NAME: &str = "MultiPath";
+    const TASK_NAME: &str = "NetAgg";
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     pub fn is_enabled() -> bool {
@@ -34,7 +34,7 @@ mod scheduled_task {
             .is_ok_and(|out| out.status.success())
     }
 
-    /// Registers or removes the task. Shows a UAC prompt unless MultiPath is
+    /// Registers or removes the task. Shows a UAC prompt unless NetAgg is
     /// already running as administrator.
     pub fn set_enabled(enabled: bool) -> io::Result<()> {
         let code = if enabled {
@@ -44,7 +44,7 @@ mod scheduled_task {
                 _ => return Err(io::Error::other("could not tell who is signed in")),
             };
             let xml_path = std::env::temp_dir().join(format!(
-                "multipath-task-{}-{}.xml",
+                "netagg-task-{}-{}.xml",
                 std::process::id(),
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -118,7 +118,7 @@ mod scheduled_task {
             r#"<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>Starts MultiPath when you sign in.</Description>
+    <Description>Starts NetAgg when you sign in.</Description>
   </RegistrationInfo>
   <Triggers>
     <LogonTrigger>
@@ -179,8 +179,8 @@ mod scheduled_task {
 
         #[test]
         fn task_runs_the_app_elevated_at_sign_in() {
-            let xml = task_xml(r"C:\Program Files\A&B\multipath.exe", r"PC\me");
-            assert!(xml.contains(r"<Command>C:\Program Files\A&amp;B\multipath.exe</Command>"));
+            let xml = task_xml(r"C:\Program Files\A&B\netagg.exe", r"PC\me");
+            assert!(xml.contains(r"<Command>C:\Program Files\A&amp;B\netagg.exe</Command>"));
             assert!(xml.contains("<Arguments>--autostart</Arguments>"));
             assert!(xml.contains("<RunLevel>HighestAvailable</RunLevel>"));
             assert!(xml.contains(r"<UserId>PC\me</UserId>"));
@@ -224,7 +224,7 @@ mod desktop_entry {
             .filter(|dir| !dir.is_empty())
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
-        Some(config.join("autostart").join("multipath.desktop"))
+        Some(config.join("autostart").join("netagg.desktop"))
     }
 
     /// The executable is quoted as the desktop entry spec asks, with `%`
@@ -244,10 +244,10 @@ mod desktop_entry {
         format!(
             "[Desktop Entry]\n\
              Type=Application\n\
-             Name=MultiPath\n\
-             Comment=Starts MultiPath when you sign in.\n\
+             Name=NetAgg\n\
+             Comment=Starts NetAgg when you sign in.\n\
              Exec=\"{quoted}\" {AUTOSTART_ARG}\n\
-             Icon=multipath\n\
+             Icon=netagg\n\
              Terminal=false\n\
              X-GNOME-Autostart-enabled=true\n"
         )
@@ -267,7 +267,7 @@ mod desktop_entry {
 }
 
 /// launchd starts every agent in `~/Library/LaunchAgents` when the user logs
-/// in. MultiPath asks for administrator rights as it turns on, so the agent
+/// in. NetAgg asks for administrator rights as it turns on, so the agent
 /// itself needs none.
 #[cfg(target_os = "macos")]
 mod launch_agent {
@@ -276,7 +276,7 @@ mod launch_agent {
 
     use super::AUTOSTART_ARG;
 
-    const LABEL: &str = "dev.multipath.app";
+    const LABEL: &str = "dev.netagg.app";
 
     pub fn is_enabled() -> bool {
         agent_path().is_some_and(|path| path.exists())
@@ -349,19 +349,19 @@ mod launch_agent {
 
         #[test]
         fn agent_runs_the_app_at_login() {
-            let text = plist("/Applications/A&B <x>.app/Contents/MacOS/multipath");
+            let text = plist("/Applications/A&B <x>.app/Contents/MacOS/netagg");
             assert!(text.contains(
-                "<string>/Applications/A&amp;B &lt;x&gt;.app/Contents/MacOS/multipath</string>"
+                "<string>/Applications/A&amp;B &lt;x&gt;.app/Contents/MacOS/netagg</string>"
             ));
             assert!(text.contains("<string>--autostart</string>"));
             assert!(text.contains("<key>RunAtLoad</key>\n  <true/>"));
-            assert!(text.contains("<string>dev.multipath.app</string>"));
+            assert!(text.contains("<string>dev.netagg.app</string>"));
         }
 
         #[test]
         fn agent_lives_in_the_users_library() {
             let path = agent_path().unwrap();
-            assert!(path.ends_with("Library/LaunchAgents/dev.multipath.app.plist"));
+            assert!(path.ends_with("Library/LaunchAgents/dev.netagg.app.plist"));
         }
     }
 }

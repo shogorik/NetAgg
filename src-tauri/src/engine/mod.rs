@@ -44,9 +44,9 @@ use crate::sys::Route;
 use crate::sys::{DnsGuard, PreferIpv4};
 use flows::FlowGuard;
 
-/// Name of the virtual adapter MultiPath creates. macOS names every utun
+/// Name of the virtual adapter NetAgg creates. macOS names every utun
 /// itself (`utunN`), so there the adapter is known by its address.
-pub const TUN_NAME: &str = "MultiPath";
+pub const TUN_NAME: &str = "NetAgg";
 pub const TUN_V4: Ipv4Addr = Ipv4Addr::new(10, 77, 0, 1);
 /// A unique local address, so IPv6 can be captured too.
 pub const TUN_V6: Ipv6Addr = Ipv6Addr::new(0xfd77, 0x6d70, 0, 0, 0, 0, 0, 1);
@@ -242,7 +242,7 @@ fn wintun_path() -> PathBuf {
 /// The routes that send everything into the adapter, IPv6 included: it's
 /// always captured, even when no network has it yet or it's switched off,
 /// otherwise it would go straight out of whichever network has an IPv6
-/// route, around MultiPath. Flows the router has no link for are refused.
+/// route, around NetAgg. Flows the router has no link for are refused.
 /// Needs administrator rights.
 fn add_capture(if_index: u32) -> io::Result<Vec<Route>> {
     crate::sys::add_unicast_address(if_index, IpAddr::V6(TUN_V6), 64)?;

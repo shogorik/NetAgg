@@ -1,4 +1,4 @@
-//! Blocks DNS (port 53) that would go around MultiPath while the user's own
+//! Blocks DNS (port 53) that would go around NetAgg while the user's own
 //! servers are in force. The Windows DNS client can also ask each network's
 //! servers directly, and a router's server is on-link, where the capture
 //! routes don't reach. The filters live in a dynamic WFP session, so Windows
@@ -16,7 +16,7 @@ use windows_sys::Win32::System::Rpc::RPC_C_AUTHN_WINNT;
 
 use super::elevation::wide;
 
-/// MultiPath's own sublayer, so its permits and its block are weighed
+/// NetAgg's own sublayer, so its permits and its block are weighed
 /// against each other and not against other software's filters.
 const SUBLAYER: GUID = GUID::from_u128(0x6d70_6e73_3a1f_4b8e_9c2d_4d55_4c54_4950);
 const DNS_PORT: u16 = 53;
@@ -42,10 +42,10 @@ fn check(code: u32, what: &str) -> io::Result<()> {
 
 impl DnsGuard {
     /// Lets port 53 out only through the adapter (`tun_index`), from
-    /// MultiPath itself (its upstream queries) and on loopback. Needs
+    /// NetAgg itself (its upstream queries) and on loopback. Needs
     /// administrator rights.
     pub fn apply(tun_index: u32) -> io::Result<DnsGuard> {
-        let mut name = wide("MultiPath DNS guard");
+        let mut name = wide("NetAgg DNS guard");
         let mut session: FWPM_SESSION0 = unsafe { std::mem::zeroed() };
         session.flags = FWPM_SESSION_FLAG_DYNAMIC;
         session.displayData.name = name.as_mut_ptr();
@@ -81,7 +81,7 @@ impl DnsGuard {
         let mut app_id: *mut FWP_BYTE_BLOB = null_mut();
         check(
             FwpmGetAppIdFromFileName0(exe.as_ptr(), &mut app_id),
-            "identify MultiPath to WFP",
+            "identify NetAgg to WFP",
         )?;
         let result = self.add_with(&mut tun_luid, app_id, name);
         FwpmFreeMemory0(&mut app_id as *mut _ as *mut *mut core::ffi::c_void);

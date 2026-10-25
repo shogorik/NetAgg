@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 /// Sent by a second copy; a bare connection (a liveness check) isn't a request.
 const SHOW: &[u8] = b"s";
 
-/// Proof that this is the only running copy of MultiPath: it listens on a
+/// Proof that this is the only running copy of NetAgg: it listens on a
 /// socket in the user's runtime folder. Dropping it, or exiting, lets the
 /// next copy start.
 pub struct Instance {
@@ -75,8 +75,8 @@ impl Drop for Instance {
 /// `$XDG_RUNTIME_DIR` is private to the user, so nobody else can take the name.
 fn socket_path() -> PathBuf {
     match std::env::var_os("XDG_RUNTIME_DIR") {
-        Some(dir) => PathBuf::from(dir).join("multipath.sock"),
-        None => std::env::temp_dir().join(format!("multipath-{}.sock", unsafe { libc::getuid() })),
+        Some(dir) => PathBuf::from(dir).join("netagg.sock"),
+        None => std::env::temp_dir().join(format!("netagg-{}.sock", unsafe { libc::getuid() })),
     }
 }
 

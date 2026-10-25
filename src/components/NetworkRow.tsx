@@ -6,7 +6,7 @@ import { Toggle } from "./Toggle";
 interface Props {
   link: LinkStatus;
   color: string;
-  /** MultiPath is on, so show live traffic. */
+  /** NetAgg is on, so show live traffic. */
   live: boolean;
   onEnabled: (enabled: boolean) => void;
 }
@@ -20,7 +20,7 @@ export function NetworkRow({ link, color, live, onEnabled }: Props) {
     detail = "Not available";
   } else if (showTraffic) {
     value = formatRate(link.rxRate);
-    // Where Windows sends what MultiPath doesn't carry, and everything once it's off.
+    // Where Windows sends what NetAgg doesn't carry, and everything once it's off.
     detail = `${link.share}% · ${link.connections} conn${link.isDefault ? " · default" : ""}`;
   } else if (live) {
     value = "—";

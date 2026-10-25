@@ -8,7 +8,7 @@
 # from one machine to the next: each run adds its bundles, their .sig files and its entries in
 # latest.json (the feed the app reads from the latest release), and rewrites SHA256SUMS. A run
 # for a new version starts the feed over. Uploads nothing: attach every file in release-assets/
-# to the release tagged v<version> on shogorik/MultiPath-Hardened.
+# to the release tagged v<version> on shogorik/NetAgg.
 #
 # Without a Mac, the macOS workflow (.github/workflows/macos.yml) builds the .app and .dmg, unsigned
 # for the updater. --macos-from takes its downloaded artifact instead of building, on any system:
@@ -17,13 +17,13 @@
 #   gh run download --name macos-bundle --dir macos-bundle
 #   scripts/release.sh --macos-from macos-bundle
 #
-# The updater key is read from MULTIPATH_UPDATER_KEY (default ~/.config/multipath-hardened/updater.key) by
+# The updater key is read from NETAGG_UPDATER_KEY (default ~/.config/netagg/updater.key) by
 # path; it is never printed, copied or put in the environment as text.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-REPO="shogorik/MultiPath-Hardened"
-KEY="${MULTIPATH_UPDATER_KEY:-$HOME/.config/multipath-hardened/updater.key}"
+REPO="shogorik/NetAgg"
+KEY="${NETAGG_UPDATER_KEY:-$HOME/.config/netagg/updater.key}"
 MACOS_FROM=""
 if [[ "${1:-}" == "--macos-from" ]]; then
   MACOS_FROM="${2:?--macos-from needs the artifact directory}"
@@ -52,8 +52,8 @@ case "$(uname -s)" in
     [[ "$(stat -f %Lp "$KEY")" == "600" ]] || die "$KEY must be mode 0600 (chmod 600 '$KEY')"
     TARGET="aarch64-apple-darwin"
     BUNDLE="src-tauri/target/$TARGET/release/bundle"
-    EXTRA=("dmg/MultiPath_${VERSION}_aarch64.dmg")
-    FEED=("darwin-aarch64-app=macos/MultiPath.app.tar.gz" "darwin-aarch64=macos/MultiPath.app.tar.gz")
+    EXTRA=("dmg/NetAgg_${VERSION}_aarch64.dmg")
+    FEED=("darwin-aarch64-app=macos/NetAgg.app.tar.gz" "darwin-aarch64=macos/NetAgg.app.tar.gz")
     ;;
   Linux)
     [[ "$(stat -c %a "$KEY")" == "600" ]] || die "$KEY must be mode 0600 (chmod 600 '$KEY')"
@@ -61,9 +61,9 @@ case "$(uname -s)" in
     BUNDLE="src-tauri/target/$TARGET/release/bundle"
     EXTRA=()
     FEED=(
-      "linux-x86_64-deb=deb/MultiPath_${VERSION}_amd64.deb"
-      "linux-x86_64-appimage=appimage/MultiPath_${VERSION}_amd64.AppImage"
-      "linux-x86_64=appimage/MultiPath_${VERSION}_amd64.AppImage"
+      "linux-x86_64-deb=deb/NetAgg_${VERSION}_amd64.deb"
+      "linux-x86_64-appimage=appimage/NetAgg_${VERSION}_amd64.AppImage"
+      "linux-x86_64=appimage/NetAgg_${VERSION}_amd64.AppImage"
     )
     ;;
   MINGW* | MSYS* | CYGWIN*)
@@ -71,8 +71,8 @@ case "$(uname -s)" in
     BUNDLE="src-tauri/target/$TARGET/release/bundle"
     EXTRA=()
     FEED=(
-      "windows-x86_64-nsis=nsis/MultiPath_${VERSION}_x64-setup.exe"
-      "windows-x86_64=nsis/MultiPath_${VERSION}_x64-setup.exe"
+      "windows-x86_64-nsis=nsis/NetAgg_${VERSION}_x64-setup.exe"
+      "windows-x86_64=nsis/NetAgg_${VERSION}_x64-setup.exe"
     )
     # tauri is a Windows program: give it Windows paths.
     NATIVE_PATHS=1
@@ -82,11 +82,11 @@ case "$(uname -s)" in
 esac
 
 if [[ -n "$MACOS_FROM" ]]; then
-  # The workflow's artifact: the .dmg and MultiPath.app.tar.gz side by side.
+  # The workflow's artifact: the .dmg and NetAgg.app.tar.gz side by side.
   BUNDLE="$MACOS_FROM"
-  EXTRA=("MultiPath_${VERSION}_aarch64.dmg")
-  FEED=("darwin-aarch64-app=MultiPath.app.tar.gz" "darwin-aarch64=MultiPath.app.tar.gz")
-  archive="$BUNDLE/MultiPath.app.tar.gz"
+  EXTRA=("NetAgg_${VERSION}_aarch64.dmg")
+  FEED=("darwin-aarch64-app=NetAgg.app.tar.gz" "darwin-aarch64=NetAgg.app.tar.gz")
+  archive="$BUNDLE/NetAgg.app.tar.gz"
   [[ -f "$archive" ]] || die "missing $archive"
   [[ -n "$NATIVE_PATHS" ]] && archive="$(cygpath -w "$archive")"
   # Signed here, so the key stays on this machine. --app-version puts the version in the trusted
@@ -119,7 +119,7 @@ for entry in "${FEED[@]}"; do
   # The macOS archive has no version in its name. Renaming doesn't touch the signature: it covers
   # the bytes, not the name.
   name="$(basename "$file")"
-  [[ "$name" == MultiPath.app.tar.gz ]] && name="MultiPath_${VERSION}_aarch64.app.tar.gz"
+  [[ "$name" == NetAgg.app.tar.gz ]] && name="NetAgg_${VERSION}_aarch64.app.tar.gz"
   cp "$BUNDLE/$file" "$OUT/$name"
   cp "$BUNDLE/$file.sig" "$OUT/$name.sig"
   ENTRIES+=("$platform=$name")
@@ -133,7 +133,7 @@ VERSION="$VERSION" NOTES="$NOTES" BASE="https://github.com/$REPO/releases/downlo
     const feed = fs.existsSync(path)
       ? JSON.parse(fs.readFileSync(path, "utf8"))
       : { version: VERSION, notes: "", pub_date: "", platforms: {} };
-    if (NOTES || !feed.notes) feed.notes = NOTES || `MultiPath ${VERSION}`;
+    if (NOTES || !feed.notes) feed.notes = NOTES || `NetAgg ${VERSION}`;
     feed.pub_date = new Date().toISOString().replace(/\.\d+Z$/, "Z");
     for (const entry of process.argv.slice(1)) {
       const [platform, name] = entry.split("=");

@@ -13,7 +13,7 @@ pub(super) fn interface_name(if_index: u32) -> Option<String> {
 
 /// True for an `enN` port: macOS gives every network port (Wi-Fi, Ethernet,
 /// a USB tether) that name, and its virtual interfaces their own prefixes:
-/// `utun` (VPNs, Tailscale, MultiPath itself), `bridge`, `awdl`/`llw`
+/// `utun` (VPNs, Tailscale, NetAgg itself), `bridge`, `awdl`/`llw`
 /// (AirDrop), `ap` (hotspot), `anpi`, `gif`, `stf`, `lo`.
 pub fn has_connector(if_index: u32) -> bool {
     interface_name(if_index).is_some_and(|name| is_port(&name))

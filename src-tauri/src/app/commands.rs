@@ -19,8 +19,8 @@ pub const ELEVATED_ARG: &str = "--elevated";
 /// Passed along with `ELEVATED_ARG` when the user asked to turn on.
 pub const TURN_ON_ARG: &str = "--turn-on";
 
-/// Turns MultiPath on or off. Turning on without administrator rights
-/// restarts MultiPath elevated, through the UAC (or pkexec) prompt, and this
+/// Turns NetAgg on or off. Turning on without administrator rights
+/// restarts NetAgg elevated, through the UAC (or pkexec) prompt, and this
 /// copy exits. macOS asks for the password as it turns on instead.
 pub async fn switch(app: &AppHandle, on: bool) -> Result<(), String> {
     let state = app.state::<AppState>();

@@ -51,7 +51,7 @@ export function failureOf(err: unknown): { failure: UpdateFailure; detail: strin
 export function updateErrorText(error: Extract<UpdateState, { step: "error" }>, platform: Platform): string {
   if (error.during === "restart") {
     const where = platform === "macos" ? "the menu bar" : "its tray icon";
-    return `The update is installed. Quit MultiPath from ${where} and open it again to finish.`;
+    return `The update is installed. Quit NetAgg from ${where} and open it again to finish.`;
   }
   switch (error.failure) {
     case "signature":
@@ -61,11 +61,11 @@ export function updateErrorText(error: Extract<UpdateState, { step: "error" }>, 
     case "permission":
       switch (platform) {
         case "macos":
-          return "MultiPath couldn't replace itself. Move it to the Applications folder, then try again.";
+          return "NetAgg couldn't replace itself. Move it to the Applications folder, then try again.";
         case "linux":
-          return "MultiPath couldn't replace itself. Enter your password when Linux asks, or move the AppImage to a folder you can write to, then try again.";
+          return "NetAgg couldn't replace itself. Enter your password when Linux asks, or move the AppImage to a folder you can write to, then try again.";
         default:
-          return "MultiPath couldn't replace itself. Allow the administrator prompt, then try again.";
+          return "NetAgg couldn't replace itself. Allow the administrator prompt, then try again.";
       }
     case "network":
       return error.during === "check"
@@ -82,7 +82,7 @@ export function updateErrorText(error: Extract<UpdateState, { step: "error" }>, 
 export function installNote(platform: Platform): string {
   switch (platform) {
     case "macos":
-      return "If MultiPath is on, macOS asks for your password again.";
+      return "If NetAgg is on, macOS asks for your password again.";
     case "linux":
       return "Linux may ask for your password.";
     default:

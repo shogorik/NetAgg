@@ -1,6 +1,6 @@
 //! Routes and addresses on the virtual adapter, through `route(8)` and
 //! `ifconfig(8)`. Routes through a utun go away with it, even after
-//! `kill -9`, so stale ones can only sit on a MultiPath utun that's still
+//! `kill -9`, so stale ones can only sit on a NetAgg utun that's still
 //! open.
 
 use std::io;

@@ -8,7 +8,7 @@ const LOOSE: &str = "2";
 
 /// Strict reverse-path filtering drops a reply that comes in on a link
 /// whenever the route back to its sender goes elsewhere, and while
-/// MultiPath is on that route always goes into the adapter. Loose mode only
+/// NetAgg is on that route always goes into the adapter. Loose mode only
 /// asks for some route back. Strict settings (per interface, `all`, and
 /// `default` for links that appear later) are loosened until this is dropped.
 pub struct LooseRpFilter {

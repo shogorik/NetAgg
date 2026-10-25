@@ -57,11 +57,11 @@ jobs:
           VERSION="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
           BUNDLE="src-tauri/target/aarch64-apple-darwin/release/bundle"
           mkdir -p out
-          cp "$BUNDLE/dmg/MultiPath_${VERSION}_aarch64.dmg" out/
-          # The updater drops the first path component, so the archive holds MultiPath.app/…
+          cp "$BUNDLE/dmg/NetAgg_${VERSION}_aarch64.dmg" out/
+          # The updater drops the first path component, so the archive holds NetAgg.app/…
           # COPYFILE_DISABLE and --no-mac-metadata keep AppleDouble ._ files and xattrs out.
-          COPYFILE_DISABLE=1 tar --no-mac-metadata -czf out/MultiPath.app.tar.gz \
-            -C "$BUNDLE/macos" MultiPath.app
+          COPYFILE_DISABLE=1 tar --no-mac-metadata -czf out/NetAgg.app.tar.gz \
+            -C "$BUNDLE/macos" NetAgg.app
           ls -l out
       - uses: actions/upload-artifact@v7
         with:

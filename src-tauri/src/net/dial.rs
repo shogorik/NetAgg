@@ -1,5 +1,5 @@
 //! Sockets that leave through one specific network, whatever the routing
-//! table says. Everything MultiPath sends to the internet goes through here.
+//! table says. Everything NetAgg sends to the internet goes through here.
 
 use std::io;
 use std::net::{IpAddr, SocketAddr};

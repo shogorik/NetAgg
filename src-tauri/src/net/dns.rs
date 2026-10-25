@@ -406,7 +406,7 @@ impl Resolver {
 }
 
 /// Leaves out what can't be a network's own server: loopback stubs
-/// (systemd-resolved's 127.0.0.53), MultiPath's own address, and the
+/// (systemd-resolved's 127.0.0.53), NetAgg's own address, and the
 /// site-local placeholders Windows lists when IPv6 has no DNS.
 fn is_network_dns(ip: &IpAddr) -> bool {
     match ip {

@@ -22,7 +22,7 @@ pub fn is_oversized_datagram(err: &io::Error) -> bool {
 }
 
 /// Forces a socket's traffic out of one interface, whatever the routing table
-/// says. This is what keeps MultiPath's own connections from looping back into
+/// says. This is what keeps NetAgg's own connections from looping back into
 /// the virtual adapter that captures everything else.
 pub fn pin_socket_to_interface(socket: &Socket, if_index: u32, v6: bool) -> io::Result<()> {
     // IPv4 takes the index in network byte order, IPv6 in host order.

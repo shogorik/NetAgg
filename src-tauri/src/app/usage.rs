@@ -1,4 +1,4 @@
-//! Data sent and received through MultiPath today, for "3.4 GB today".
+//! Data sent and received through NetAgg today, for "3.4 GB today".
 
 use std::path::Path;
 
@@ -72,8 +72,7 @@ mod tests {
 
     #[test]
     fn survives_a_restart() {
-        let path =
-            std::env::temp_dir().join(format!("multipath-usage-{}.json", std::process::id()));
+        let path = std::env::temp_dir().join(format!("netagg-usage-{}.json", std::process::id()));
         let mut usage = Usage::default();
         usage.add((2026, 10, 12), 42);
         usage.save(&path);

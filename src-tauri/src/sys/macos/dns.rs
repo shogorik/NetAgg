@@ -4,11 +4,11 @@ use std::net::IpAddr;
 use super::adapters::interface_name;
 use super::command::{self, Cmd, SCUTIL};
 
-/// MultiPath's entry in configd's dynamic store. It lives in memory only
+/// NetAgg's entry in configd's dynamic store. It lives in memory only
 /// (gone at reboot) and nothing in the saved network settings changes.
-const KEY: &str = "State:/Network/Service/dev.multipath.app/DNS";
+const KEY: &str = "State:/Network/Service/dev.netagg.app/DNS";
 
-/// Sends lookups to `servers` through the adapter while MultiPath is on, as a
+/// Sends lookups to `servers` through the adapter while NetAgg is on, as a
 /// supplemental resolver for every domain (match domain `""`), the way VPN
 /// clients do. Other resolvers (a VPN's own, Tailscale's) stay as they were.
 /// Removed again when dropped.
@@ -156,7 +156,7 @@ mod tests {
              d.add ServerAddresses * 8.8.8.8 2606:4700::1111\n\
              d.add SupplementalMatchDomains * \"\"\n\
              d.add InterfaceName utun5\n\
-             set State:/Network/Service/dev.multipath.app/DNS\n\
+             set State:/Network/Service/dev.netagg.app/DNS\n\
              quit\n"
         );
     }
@@ -180,7 +180,7 @@ mod tests {
             .contains("InterfaceName lo0"));
         assert_eq!(
             calls[1].stdin.as_deref(),
-            Some("remove State:/Network/Service/dev.multipath.app/DNS\nquit\n")
+            Some("remove State:/Network/Service/dev.netagg.app/DNS\nquit\n")
         );
     }
 

@@ -1,5 +1,5 @@
 //! Which network Windows routes through by default: the one with the lowest
-//! interface metric. MultiPath marks its choice with a metric of its own, so
+//! interface metric. NetAgg marks its choice with a metric of its own, so
 //! a later run finds and undoes it without having to remember anything.
 
 use std::io;

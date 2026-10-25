@@ -131,8 +131,8 @@ pub fn percents(values: &[u64]) -> Vec<u8> {
 
 pub fn build(state: &AppState) -> Status {
     let settings = state.settings();
-    // While on, the OS default is MultiPath's own adapter, and the last real
-    // one seen may be from before MultiPath changed it.
+    // While on, the OS default is NetAgg's own adapter, and the last real
+    // one seen may be from before NetAgg changed it.
     let default_id = match state.applied_default() {
         Some(index) => state
             .links
@@ -233,7 +233,7 @@ pub fn build(state: &AppState) -> Status {
 /// The text shown when hovering over the tray icon.
 pub fn tooltip(status: &Status) -> String {
     if !status.on {
-        return "MultiPath — off".into();
+        return "NetAgg — off".into();
     }
     let combining = status
         .links
@@ -241,8 +241,8 @@ pub fn tooltip(status: &Status) -> String {
         .filter(|l| l.present && l.enabled && l.health != "down")
         .count();
     match combining {
-        1 => "MultiPath — on, 1 network".into(),
-        n => format!("MultiPath — combining {n} networks"),
+        1 => "NetAgg — on, 1 network".into(),
+        n => format!("NetAgg — combining {n} networks"),
     }
 }
 

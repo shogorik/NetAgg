@@ -51,7 +51,7 @@ pub fn run() {
     tauri::Builder::default()
         // Signed self-updates: the popup checks, the user confirms, the
         // plugin verifies the download's signature, then it's installed and
-        // MultiPath restarts.
+        // NetAgg restarts.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(popup::PopupState::default())
@@ -95,7 +95,7 @@ pub fn run() {
                 instance.on_show_requested(move || popup::show(&handle));
             }
             app.manage(Mutex::new(instance));
-            // At sign-in MultiPath starts quietly in the tray.
+            // At sign-in NetAgg starts quietly in the tray.
             if !at_sign_in {
                 popup::show(app.handle());
             }
@@ -112,7 +112,7 @@ pub fn run() {
             }
         })
         .build(tauri::generate_context!())
-        .expect("error while starting MultiPath")
+        .expect("error while starting NetAgg")
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 // Give the PC its own routing back before going.
@@ -152,7 +152,7 @@ mod tests {
         assert_eq!(
             updater["endpoints"],
             serde_json::json!([
-                "https://github.com/shogorik/MultiPath-Hardened/releases/latest/download/latest.json"
+                "https://github.com/shogorik/NetAgg/releases/latest/download/latest.json"
             ])
         );
         // A minisign public key (base64 of its text form), never a secret key.
@@ -222,8 +222,7 @@ mod tests {
         let feed = json(&std::fs::read_to_string(assets.join("latest.json")).unwrap());
         let version = env!("CARGO_PKG_VERSION");
         assert_eq!(feed["version"], version);
-        let base =
-            format!("https://github.com/shogorik/MultiPath-Hardened/releases/download/v{version}/");
+        let base = format!("https://github.com/shogorik/NetAgg/releases/download/v{version}/");
         let platforms = feed["platforms"].as_object().unwrap();
         assert!(!platforms.is_empty());
 

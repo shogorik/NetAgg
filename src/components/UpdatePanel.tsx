@@ -20,10 +20,10 @@ export function UpdatePanel({ status, update }: Props) {
     case "upToDate": {
       const [title, desc] =
         state.step === "idle"
-          ? [`MultiPath ${current}`, "Look for a newer version. Nothing is installed until you say so."]
+          ? [`NetAgg ${current}`, "Look for a newer version. Nothing is installed until you say so."]
           : state.step === "checking"
-            ? ["Checking for updates…", `You have MultiPath ${current}.`]
-            : ["You're up to date", `MultiPath ${current} is the newest version.`];
+            ? ["Checking for updates…", `You have NetAgg ${current}.`]
+            : ["You're up to date", `NetAgg ${current} is the newest version.`];
       return (
         <div className="setting-row" aria-busy={isBusy(state)}>
           <Text title={title} desc={desc} />
@@ -42,8 +42,8 @@ export function UpdatePanel({ status, update }: Props) {
       return (
         <div className="setting-row stacked">
           <Text
-            title={`MultiPath ${state.version} is available`}
-            desc={`You have ${current}. Installing downloads it, checks its signature, replaces this version and restarts MultiPath. ${installNote(status.platform)}`}
+            title={`NetAgg ${state.version} is available`}
+            desc={`You have ${current}. Installing downloads it, checks its signature, replaces this version and restarts NetAgg. ${installNote(status.platform)}`}
           />
           {state.notes && (
             <div className="update-notes" tabIndex={0} aria-label={`What's new in ${state.version}`}>
@@ -67,7 +67,7 @@ export function UpdatePanel({ status, update }: Props) {
           <Text
             title={
               state.step === "downloading"
-                ? `Downloading MultiPath ${state.version}…`
+                ? `Downloading NetAgg ${state.version}…`
                 : "Checking the signature and installing…"
             }
           />
@@ -77,7 +77,7 @@ export function UpdatePanel({ status, update }: Props) {
     case "restarting":
       return (
         <div className="setting-row" aria-busy>
-          <Text title={`MultiPath ${state.version} is installed`} desc="Restarting MultiPath…" />
+          <Text title={`NetAgg ${state.version} is installed`} desc="Restarting NetAgg…" />
         </div>
       );
     case "error":
@@ -91,12 +91,12 @@ export function UpdatePanel({ status, update }: Props) {
                   ? "Couldn't check for updates"
                   : state.during === "install"
                     ? "Couldn't install the update"
-                    : "Couldn't restart MultiPath"}
+                    : "Couldn't restart NetAgg"}
               </span>
             </span>
             <span className="setting-desc">{updateErrorText(state, status.platform)}</span>
             {state.during !== "restart" && (
-              <span className="setting-desc">You can also download MultiPath yourself from {RELEASES_PAGE}.</span>
+              <span className="setting-desc">You can also download NetAgg yourself from {RELEASES_PAGE}.</span>
             )}
           </div>
           <div className="update-actions">
@@ -129,7 +129,7 @@ function ProgressBar({ state }: { state: Extract<UpdateState, { step: "downloadi
   const done = state.step === "downloading" ? percent(state.downloaded, state.total) : null;
   const text =
     state.step === "installing"
-      ? "Only a download signed by MultiPath is installed."
+      ? "Only a download signed by NetAgg is installed."
       : state.total
         ? `${done}% · ${formatBytes(state.downloaded)} of ${formatBytes(state.total)}`
         : `${formatBytes(state.downloaded)} downloaded`;

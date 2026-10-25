@@ -36,7 +36,7 @@ fn physical_wh(size: &Size) -> (f64, f64) {
 }
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open MultiPath", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open NetAgg", true, None::<&str>)?;
     let toggle = MenuItem::with_id(app, "toggle", "Turn on", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
@@ -48,7 +48,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(Image::from_bytes(ICON_OFF)?)
-        .tooltip("MultiPath — off")
+        .tooltip("NetAgg — off")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -83,7 +83,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Shows whether MultiPath is combining networks, in the icon, its tooltip
+/// Shows whether NetAgg is combining networks, in the icon, its tooltip
 /// and the menu.
 pub fn set_active(app: &AppHandle, active: bool, tooltip: &str) -> tauri::Result<()> {
     let state = app.state::<TrayState>();

@@ -4,7 +4,7 @@ use std::path::Path;
 use super::command::{self, Cmd, OSASCRIPT};
 
 /// Whether this process may set up the adapter and routes itself: it runs as
-/// root (`sudo multipath --headless`). The app normally doesn't, and asks a
+/// root (`sudo netagg --headless`). The app normally doesn't, and asks a
 /// root helper instead (see `elevates_in_place`).
 pub fn is_elevated() -> bool {
     unsafe { libc::geteuid() == 0 }
@@ -26,13 +26,12 @@ pub fn elevates_in_place() -> bool {
 pub fn relaunch_elevated(_args: &str) -> io::Result<()> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
-        "MultiPath asks for administrator rights when it turns on",
+        "NetAgg asks for administrator rights when it turns on",
     ))
 }
 
-/// What the password dialog says, under "MultiPath wants to make changes."
-const PROMPT: &str =
-    "MultiPath needs to add a network adapter and routes to combine your networks.";
+/// What the password dialog says, under "NetAgg wants to make changes."
+const PROMPT: &str = "NetAgg needs to add a network adapter and routes to combine your networks.";
 
 /// Starts `program args…` as root in the background, after the standard
 /// macOS administrator password dialog. Returns once it has started.
@@ -101,7 +100,7 @@ mod tests {
     #[test]
     fn builds_the_prompt_command() {
         let cmd = admin_cmd(
-            Path::new("/Applications/Multi Path.app/Contents/MacOS/multipath"),
+            Path::new("/Applications/Multi Path.app/Contents/MacOS/netagg"),
             &["--tunnel-helper".into(), "/tmp/x/it's.sock".into()],
         );
         assert_eq!(cmd.program, "/usr/bin/osascript");
@@ -109,7 +108,7 @@ mod tests {
         assert_eq!(
             cmd.args[1],
             format!(
-                "do shell script \"'/Applications/Multi Path.app/Contents/MacOS/multipath' \
+                "do shell script \"'/Applications/Multi Path.app/Contents/MacOS/netagg' \
                  '--tunnel-helper' '/tmp/x/it'\\\\''s.sock' </dev/null >/dev/null 2>&1 &\" \
                  with administrator privileges with prompt \"{PROMPT}\""
             )

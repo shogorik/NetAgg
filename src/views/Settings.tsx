@@ -157,7 +157,7 @@ export function Settings({ status, onStatus, onBack, update }: Props) {
           <UpdatePanel status={status} update={update} />
           <SwitchRow
             label="Check for updates at start"
-            desc="Asks GitHub for a newer version when MultiPath opens. Never installs without asking."
+            desc="Asks GitHub for a newer version when NetAgg opens. Never installs without asking."
             on={settings.checkUpdates}
             onChange={(checkUpdates) => change({ checkUpdates })}
           />
@@ -248,7 +248,7 @@ interface DefaultRowProps {
   onChange: (id: string | null) => void;
 }
 
-/** Which network Windows routes through by default, MultiPath on or off. */
+/** Which network Windows routes through by default, NetAgg on or off. */
 function DefaultRow({ links, chosen, onChange }: DefaultRowProps) {
   // A chosen network that's unplugged stays listed, so the choice is visible.
   const options = links.filter((l) => l.present || l.id === chosen);
@@ -270,7 +270,7 @@ function DefaultRow({ links, chosen, onChange }: DefaultRowProps) {
           ))}
         </select>
         <span className="setting-desc">
-          What Windows uses while MultiPath is off, and for traffic it doesn't carry. Applied while MultiPath has
+          What Windows uses while NetAgg is off, and for traffic it doesn't carry. Applied while NetAgg has
           administrator rights.
         </span>
       </div>

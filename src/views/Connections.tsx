@@ -46,7 +46,7 @@ export function Connections({ status, onBack }: Props) {
         <div className="empty">
           {status.on
             ? "No open connections right now."
-            : "Turn on MultiPath to see which network each connection uses."}
+            : "Turn on NetAgg to see which network each connection uses."}
         </div>
       ) : (
         <div className="connections" role="list">

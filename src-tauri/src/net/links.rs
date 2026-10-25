@@ -1,4 +1,4 @@
-//! The physical networks MultiPath can send traffic through.
+//! The physical networks NetAgg can send traffic through.
 
 use std::collections::VecDeque;
 use std::net::{Ipv4Addr, Ipv6Addr};
@@ -383,7 +383,7 @@ impl Links {
             .collect()
     }
 
-    /// The network Windows itself would use, as last seen without MultiPath
+    /// The network Windows itself would use, as last seen without NetAgg
     /// in the way.
     pub fn default_link(&self) -> Option<Arc<Link>> {
         let index = self.default_if.load(Ordering::Relaxed);
@@ -411,7 +411,7 @@ impl Links {
     /// Returns true when something changed.
     pub fn refresh(&self) -> bool {
         let found = discover();
-        // While MultiPath is on, the default is its own adapter, which isn't in
+        // While NetAgg is on, the default is its own adapter, which isn't in
         // the list; the last real default is kept then.
         if let Ok(default) = netdev::get_default_interface() {
             if found.iter().any(|(_, info)| info.if_index == default.index) {

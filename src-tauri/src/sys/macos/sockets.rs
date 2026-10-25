@@ -14,7 +14,7 @@ pub fn is_oversized_datagram(_err: &io::Error) -> bool {
 }
 
 /// Forces a socket's traffic out of one interface, whatever the routing table
-/// says. This is what keeps MultiPath's own connections from looping back into
+/// says. This is what keeps NetAgg's own connections from looping back into
 /// the virtual adapter that captures everything else.
 ///
 /// `IP_BOUND_IF` / `IPV6_BOUND_IF` (one option per family) make the kernel
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn names_this_process() {
         let name = process_name(std::process::id()).unwrap();
-        assert!(name.starts_with("multipath"), "{name}");
+        assert!(name.starts_with("netagg"), "{name}");
         assert_eq!(process_name(u32::MAX), None);
     }
 }

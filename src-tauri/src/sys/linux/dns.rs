@@ -5,7 +5,7 @@ use std::process::Command;
 use super::adapters::interface_name;
 
 /// Points the adapter at `servers` and makes it the DNS route for every
-/// domain (`~.`), so lookups go through MultiPath too. systemd-resolved
+/// domain (`~.`), so lookups go through NetAgg too. systemd-resolved
 /// forgets both once the adapter is gone.
 ///
 /// Only root may: resolved asks anyone else for a password through polkit,

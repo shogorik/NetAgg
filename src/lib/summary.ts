@@ -4,7 +4,7 @@ import { formatBytes, plural } from "./format";
 /** What's switching, if anything, from the user's click or the backend. */
 export type Pending = "on" | "off" | null;
 
-/** Networks MultiPath spreads connections over while it's on. */
+/** Networks NetAgg spreads connections over while it's on. */
 export function inUse(links: LinkStatus[]): LinkStatus[] {
   return links.filter((l) => l.present && l.enabled);
 }
@@ -41,14 +41,14 @@ function osName(status: Status): string {
   }
 }
 
-/** What turning on will ask for, shown while MultiPath lacks the rights. */
+/** What turning on will ask for, shown while NetAgg lacks the rights. */
 export function elevationNote(status: Status): string {
   if (!status.canElevate) {
     return "The AppImage needs to run with sudo. Install the .deb to turn on without it.";
   }
   switch (status.platform) {
     case "linux":
-      return "Linux will ask for your password once, to give MultiPath network access.";
+      return "Linux will ask for your password once, to give NetAgg network access.";
     case "macos":
       return "macOS will ask for an administrator password each time you turn it on.";
     default:

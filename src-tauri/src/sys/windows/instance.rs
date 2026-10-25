@@ -17,8 +17,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW
 
 use super::elevation::wide;
 
-const MUTEX_NAME: &str = "Local\\MultiPath.Instance";
-const SHOW_EVENT_NAME: &str = "Local\\MultiPath.Show";
+const MUTEX_NAME: &str = "Local\\NetAgg.Instance";
+const SHOW_EVENT_NAME: &str = "Local\\NetAgg.Show";
 
 /// Everyone in the session gets full access (`Local\` is per session), and a
 /// medium integrity label lets a normal copy of the app reach objects created
@@ -63,7 +63,7 @@ impl Drop for Security {
     }
 }
 
-/// Proof that this is the only running copy of MultiPath. Dropping it, or
+/// Proof that this is the only running copy of NetAgg. Dropping it, or
 /// exiting, lets the next copy start.
 pub struct Instance {
     mutex: usize,
@@ -166,8 +166,8 @@ mod tests {
     fn names(tag: &str) -> (String, String) {
         let id = std::process::id();
         (
-            format!("Local\\MultiPath.Test.{id}.{tag}.Instance"),
-            format!("Local\\MultiPath.Test.{id}.{tag}.Show"),
+            format!("Local\\NetAgg.Test.{id}.{tag}.Instance"),
+            format!("Local\\NetAgg.Test.{id}.{tag}.Show"),
         )
     }
 

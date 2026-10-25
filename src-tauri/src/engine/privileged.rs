@@ -1,5 +1,5 @@
 //! macOS: creating the utun, its routes and its DNS need root; running the
-//! packet stack doesn't. Unless MultiPath already runs as root, turning on
+//! packet stack doesn't. Unless NetAgg already runs as root, turning on
 //! starts this same executable as a short-lived root helper, through the
 //! administrator password dialog. The helper sets everything up, hands the
 //! adapter's descriptor to the app, and undoes its changes when the app says
@@ -16,7 +16,7 @@ use tun::AbstractDevice;
 use super::{add_capture, clean_up_stale, tun_config, MTU};
 use crate::sys::{self, HelperClient, HelperLink, HelperListener, ResolverOverride, Route};
 
-/// Followed by the app's socket: `multipath --tunnel-helper <socket> [--dns <ip,ip>]`.
+/// Followed by the app's socket: `netagg --tunnel-helper <socket> [--dns <ip,ip>]`.
 pub const HELPER_ARG: &str = "--tunnel-helper";
 const DNS_ARG: &str = "--dns";
 /// From the password being accepted to the adapter arriving.
@@ -54,9 +54,9 @@ fn set_up(dns: &[IpAddr]) -> io::Result<(tun::Device, u32, Setup)> {
     ))
 }
 
-/// Where the routes and DNS are held while MultiPath is on.
+/// Where the routes and DNS are held while NetAgg is on.
 pub(super) enum Tunnel {
-    /// MultiPath runs as root and set them up itself.
+    /// NetAgg runs as root and set them up itself.
     Own(Setup),
     /// The root helper holds them.
     Helper(HelperLink),
@@ -167,7 +167,7 @@ pub fn run_helper(args: &[String]) -> i32 {
     let client = match HelperClient::connect(&request.socket) {
         Ok(client) => client,
         Err(err) => {
-            eprintln!("couldn't reach MultiPath: {err}");
+            eprintln!("couldn't reach NetAgg: {err}");
             return 1;
         }
     };
@@ -217,7 +217,7 @@ mod tests {
                 "8.8.8.8,2606:4700::1111"
             ])
         );
-        let mut argv = strings(&["/Applications/MultiPath.app/Contents/MacOS/multipath"]);
+        let mut argv = strings(&["/Applications/NetAgg.app/Contents/MacOS/netagg"]);
         argv.extend(args);
         assert_eq!(
             parse_args(&argv).unwrap(),

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "MultiPath",
-  "version": "1.2.0",
-  "identifier": "dev.multipath.app",
+  "productName": "NetAgg",
+  "version": "1.3.0",
+  "identifier": "dev.netagg.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "popup",
-        "title": "MultiPath",
+        "title": "NetAgg",
         "width": 360,
         "height": 533,
         "resizable": false,
@@ -35,16 +35,16 @@
   },
   "bundle": {
     "active": true,
-    "publisher": "MultiPath",
+    "publisher": "NetAgg",
     "category": "Utility",
     "shortDescription": "Spreads the PC's traffic across several networks at once",
-    "longDescription": "MultiPath sends each new connection through the network where it can expect the most bandwidth: Wi-Fi, Ethernet or a USB-tethered phone. A single download gets faster only if it opens several connections.",
+    "longDescription": "NetAgg sends each new connection through the network where it can expect the most bandwidth: Wi-Fi, Ethernet or a USB-tethered phone. A single download gets faster only if it opens several connections.",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"]
   },
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM0RjgxNEIzMzA0RjU1MDEKUldRQlZVOHdzeFQ0TkJIbVk0aEhuUytYejNKWjlJSkE3cDVQUzRKQTYrbU9nKy9PUlk3dUVPbG0K",
-      "endpoints": ["https://github.com/shogorik/MultiPath-Hardened/releases/latest/download/latest.json"],
+      "endpoints": ["https://github.com/shogorik/NetAgg/releases/latest/download/latest.json"],
       "requireSignedVersion": true
     }
   }

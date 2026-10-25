@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A fake network for testing MultiPath on Linux without a second network
+# A fake network for testing NetAgg on Linux without a second network
 # card: "the PC" has two uplinks, each through its own "ISP" (NAT, capped
 # at 10 Mbit/s each way), to a small "internet" that answers the health
 # probes, DNS, HTTP and iperf3.
@@ -41,7 +41,7 @@ up() {
         ip netns add "$ns"
         ip -n "$ns" link set lo up
     done
-    # Strict reverse-path filtering, as on Fedora and RHEL: MultiPath has to
+    # Strict reverse-path filtering, as on Fedora and RHEL: NetAgg has to
     # loosen it, or replies coming in on the uplinks are dropped.
     pc sysctl -qw net.ipv4.conf.all.rp_filter=1 net.ipv4.conf.default.rp_filter=1
 

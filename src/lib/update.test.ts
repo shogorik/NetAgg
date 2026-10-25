@@ -88,7 +88,7 @@ describe("UpdateFlow", () => {
   it("offline: an error with what to do", async () => {
     const { flow, seen } = flowWith({
       check: async () => {
-        throw "error sending request for url (https://github.com/shogorik/MultiPath-Hardened/releases/latest/download/latest.json)";
+        throw "error sending request for url (https://github.com/shogorik/NetAgg/releases/latest/download/latest.json)";
       },
     });
     await flow.check();

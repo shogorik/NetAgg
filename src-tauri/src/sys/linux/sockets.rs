@@ -15,7 +15,7 @@ pub fn is_oversized_datagram(_err: &io::Error) -> bool {
 }
 
 /// Forces a socket's traffic out of one interface, whatever the routing table
-/// says. This is what keeps MultiPath's own connections from looping back into
+/// says. This is what keeps NetAgg's own connections from looping back into
 /// the virtual adapter that captures everything else.
 pub fn pin_socket_to_interface(socket: &Socket, if_index: u32, _v6: bool) -> io::Result<()> {
     let name = interface_name(if_index).ok_or_else(|| {

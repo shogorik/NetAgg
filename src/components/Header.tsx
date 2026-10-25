@@ -20,13 +20,13 @@ export function Header({ on, status, dot, disabled, onToggle, onMinimize }: Prop
         <Waypoints size={18} />
       </span>
       <div className="title-block">
-        <span className="app-name">MultiPath</span>
+        <span className="app-name">NetAgg</span>
         <span className="status-line" role="status">
           <span className="dot" style={{ background: dot }} />
           <span>{status}</span>
         </span>
       </div>
-      <Toggle on={on} label="MultiPath" disabled={disabled} onChange={onToggle} />
+      <Toggle on={on} label="NetAgg" disabled={disabled} onChange={onToggle} />
       <IconButton icon={Minus} label="Minimize" onClick={onMinimize} />
     </header>
   );

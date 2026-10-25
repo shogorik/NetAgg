@@ -44,7 +44,7 @@ const off: Status = {
 const on: Status = { ...off, on: true, connections: 142, todayBytes: 3_400_000_000 };
 
 describe("summary", () => {
-  it("says what MultiPath is doing", () => {
+  it("says what NetAgg is doing", () => {
     expect(headerStatus(off, null).text).toBe("Off · Windows is using Wi-Fi only");
     expect(headerStatus({ ...off, platform: "linux" }, null).text).toBe("Off · Linux is using Wi-Fi only");
     expect(headerStatus({ ...off, platform: "macos" }, null).text).toBe("Off · macOS is using Wi-Fi only");

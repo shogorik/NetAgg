@@ -119,7 +119,7 @@ fn private_dir() -> io::Result<PathBuf> {
         .map_or(0, |d| d.subsec_nanos());
     loop {
         let n = NEXT.fetch_add(1, Ordering::Relaxed);
-        let name = format!("multipath-{}-{nanos}-{n}", std::process::id());
+        let name = format!("netagg-{}-{nanos}-{n}", std::process::id());
         let dir = std::env::temp_dir().join(name);
         match DirBuilder::new().mode(0o700).create(&dir) {
             // Left behind by an earlier process with the same id.
@@ -271,7 +271,7 @@ fn recv_with_fd(stream: &UnixStream) -> io::Result<(String, Option<OwnedFd>)> {
         while !cmsg.is_null() {
             if (*cmsg).cmsg_level == libc::SOL_SOCKET && (*cmsg).cmsg_type == libc::SCM_RIGHTS {
                 let raw = std::ptr::read_unaligned(libc::CMSG_DATA(cmsg).cast::<RawFd>());
-                // Not inherited by the tools MultiPath runs later, or the
+                // Not inherited by the tools NetAgg runs later, or the
                 // adapter would outlive the app in them.
                 libc::fcntl(raw, libc::F_SETFD, libc::FD_CLOEXEC);
                 fd = Some(OwnedFd::from_raw_fd(raw));

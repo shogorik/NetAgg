@@ -1,4 +1,4 @@
-//! MultiPath without its popup or tray, for servers and the Linux test lab.
+//! NetAgg without its popup or tray, for servers and the Linux test lab.
 //! It turns on, prints the status as one JSON line a second, and turns off
 //! again on Ctrl+C or SIGTERM.
 
@@ -15,19 +15,18 @@ pub const HEADLESS_ARG: &str = "--headless";
 /// Followed by the folder for settings and usage.
 const CONFIG_ARG: &str = "--config";
 /// The app's identifier in `tauri.conf.json`, which names its config folder.
-const IDENTIFIER: &str = "dev.multipath.app";
+const IDENTIFIER: &str = "dev.netagg.app";
 
 #[cfg(windows)]
-const MISSING_RIGHTS: &str =
-    "MultiPath needs administrator rights: run it from an elevated terminal";
+const MISSING_RIGHTS: &str = "NetAgg needs administrator rights: run it from an elevated terminal";
 #[cfg(target_os = "linux")]
 const MISSING_RIGHTS: &str = concat!(
-    "MultiPath needs network permissions: run it with sudo, or once: sudo setcap ",
-    "cap_net_admin,cap_net_raw+ep <path to multipath>"
+    "NetAgg needs network permissions: run it with sudo, or once: sudo setcap ",
+    "cap_net_admin,cap_net_raw+ep <path to netagg>"
 );
 
 #[cfg(target_os = "macos")]
-const MISSING_RIGHTS: &str = "MultiPath needs administrator rights: run it with sudo";
+const MISSING_RIGHTS: &str = "NetAgg needs administrator rights: run it with sudo";
 
 /// Runs until asked to stop, and returns the exit code.
 pub fn run() -> i32 {
@@ -40,7 +39,7 @@ pub fn run() -> i32 {
     let _instance = match sys::Instance::acquire(Duration::ZERO) {
         Ok(Some(instance)) => Some(instance),
         Ok(None) => {
-            eprintln!("MultiPath is already running");
+            eprintln!("NetAgg is already running");
             return 1;
         }
         Err(err) => {
@@ -137,7 +136,7 @@ struct StderrLog;
 
 impl log::Log for StderrLog {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.target().starts_with("multipath_lib")
+        metadata.target().starts_with("netagg_lib")
     }
 
     fn log(&self, record: &log::Record) {

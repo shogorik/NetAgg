@@ -1,4 +1,4 @@
-//! Thin wrappers over the OS APIs MultiPath needs: elevation, single
+//! Thin wrappers over the OS APIs NetAgg needs: elevation, single
 //! instance, adapter and clock queries, egress pinning, routes on the
 //! virtual adapter, IPv4/IPv6 preference, socket owner lookup, and ICMP.
 //!

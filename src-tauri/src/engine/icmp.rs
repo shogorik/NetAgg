@@ -1,5 +1,5 @@
 //! Answers captured pings by sending a real echo out through a physical
-//! network, so `ping` keeps working while MultiPath is on. IPv4 only.
+//! network, so `ping` keeps working while NetAgg is on. IPv4 only.
 
 use std::net::IpAddr;
 use std::sync::Arc;

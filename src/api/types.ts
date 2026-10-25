@@ -38,7 +38,7 @@ export interface SettingsStatus {
   /** With manual DNS, answer every app's lookups with `dns` and block the rest. */
   enforceDns: boolean;
   startOnLogin: boolean;
-  /** Look for a new version when MultiPath starts (never installs on its own). */
+  /** Look for a new version when NetAgg starts (never installs on its own). */
   checkUpdates: boolean;
   /** Leave unplugged and unconnected networks out of the list. */
   hideUnavailable: boolean;

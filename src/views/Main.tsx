@@ -27,7 +27,7 @@ export function Main({ status, onStatus, onSettings, onConnections, update }: Pr
   const turn = (on: boolean) => {
     setPending(on ? "on" : "off");
     setError(null);
-    // Without admin rights this restarts MultiPath through the UAC (or pkexec) prompt; macOS asks
+    // Without admin rights this restarts NetAgg through the UAC (or pkexec) prompt; macOS asks
     // for the administrator password instead.
     setEnabled(on)
       .then(onStatus)
@@ -68,7 +68,7 @@ export function Main({ status, onStatus, onSettings, onConnections, update }: Pr
       {update.step === "available" && (
         <div className="update-banner" role="status">
           <CircleArrowUp size={14} />
-          <span className="update-banner-text">MultiPath {update.version} is available.</span>
+          <span className="update-banner-text">NetAgg {update.version} is available.</span>
           <button type="button" className="link-button" onClick={onSettings}>
             Review
           </button>

@@ -1,4 +1,4 @@
-//! The system tools MultiPath drives on macOS (`route`, `ifconfig`, `scutil`,
+//! The system tools NetAgg drives on macOS (`route`, `ifconfig`, `scutil`,
 //! `lsof`, `osascript`). Every change to the system goes through `change`, so
 //! a dry run can log the exact commands without touching anything, and the
 //! tests can see them.
@@ -7,7 +7,7 @@ use std::io::{self, Write};
 use std::process::{Command, Stdio};
 
 /// Set (to anything) to log route, address and DNS changes instead of making them.
-pub(super) const DRY_RUN_ENV: &str = "MULTIPATH_DRY_RUN";
+pub(super) const DRY_RUN_ENV: &str = "NETAGG_DRY_RUN";
 
 // Absolute paths: the privileged helper runs as root and mustn't follow `PATH`.
 pub(super) const ROUTE: &str = "/sbin/route";

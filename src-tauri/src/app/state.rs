@@ -19,6 +19,61 @@ use crate::net::router::Router;
 /// Long enough for the relays to wind down; the routes go first regardless.
 const STOP_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// The config folder of MultiPath, which NetAgg was forked from.
+const MULTIPATH_DIR: &str = "dev.multipath.app";
+
+/// A first run takes over the settings and usage a MultiPath install left
+/// next to this config folder. Never overwrites, so it happens once.
+fn import_from_multipath(config_dir: &std::path::Path) {
+    let Some(old_dir) = config_dir.parent().map(|p| p.join(MULTIPATH_DIR)) else {
+        return;
+    };
+    if config_dir.join("settings.json").exists() || !old_dir.join("settings.json").exists() {
+        return;
+    }
+    let _ = std::fs::create_dir_all(config_dir);
+    for file in ["settings.json", "usage.json"] {
+        let from = old_dir.join(file);
+        if from.exists() {
+            match std::fs::copy(&from, config_dir.join(file)) {
+                Ok(_) => log::info!("imported {} from MultiPath", file),
+                Err(err) => log::warn!("couldn't import {file} from MultiPath: {err}"),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn imports_multipath_settings_once() {
+        let root = std::env::temp_dir().join(format!("netagg-import-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let old = root.join(MULTIPATH_DIR);
+        let new = root.join("dev.netagg.app");
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join("settings.json"), r#"{"dnsMode":"manual"}"#).unwrap();
+
+        import_from_multipath(&new);
+        assert_eq!(
+            std::fs::read_to_string(new.join("settings.json")).unwrap(),
+            r#"{"dnsMode":"manual"}"#
+        );
+        assert!(!new.join("usage.json").exists());
+
+        // Later changes in NetAgg are never overwritten.
+        std::fs::write(new.join("settings.json"), "{}").unwrap();
+        import_from_multipath(&new);
+        assert_eq!(
+            std::fs::read_to_string(new.join("settings.json")).unwrap(),
+            "{}"
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+}
+
 /// Byte counts of each flow when the connections list was last read, to
 /// turn them into rates.
 #[derive(Default)]
@@ -39,7 +94,7 @@ pub struct AppState {
     pub flows: RwLock<Option<Arc<Flows>>>,
     /// Turning on or off is under way.
     pub busy: AtomicBool,
-    /// Why MultiPath last failed to turn on, or stopped by itself.
+    /// Why NetAgg last failed to turn on, or stopped by itself.
     pub error: Mutex<Option<String>>,
     pub start_on_login: AtomicBool,
     pub flow_counts: Mutex<FlowCounts>,
@@ -53,6 +108,7 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config_dir: PathBuf, start_on_login: bool) -> AppState {
+        import_from_multipath(&config_dir);
         let settings_path = config_dir.join("settings.json");
         let usage_path = config_dir.join("usage.json");
         let settings = Settings::load(&settings_path);
@@ -101,7 +157,7 @@ impl AppState {
         self.usage.lock().unwrap().save(&self.usage_path);
     }
 
-    /// The interface MultiPath made the default route, if it made one.
+    /// The interface NetAgg made the default route, if it made one.
     pub fn applied_default(&self) -> Option<u32> {
         match self.default_applied.load(Ordering::Relaxed) {
             0 | u32::MAX => None,
@@ -221,7 +277,7 @@ impl AppState {
         };
         if stalled {
             self.turn_off(false).await;
-            *self.error.lock().unwrap() = Some("MultiPath stopped unexpectedly".into());
+            *self.error.lock().unwrap() = Some("NetAgg stopped unexpectedly".into());
         }
         stalled
     }
