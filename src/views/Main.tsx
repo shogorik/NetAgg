@@ -85,6 +85,18 @@ export function Main({ status, onStatus, onSettings, onConnections, update }: Pr
           </button>
         </div>
       )}
+      {status.links
+        .filter((l) => l.present && l.sharesLineWith)
+        .map((l) => {
+          const other = status.links.find((o) => o.id === l.sharesLineWith);
+          return (
+            <div key={l.id} className="notice" role="status">
+              {l.name} reaches the internet through the same router as {other?.name ?? "another network"}, so
+              both share one line: it adds speed only if that line is faster than {other?.name ?? "it"} alone.
+              {l.kind === "phone" ? " Turn off Wi-Fi on the phone to use its mobile data instead." : ""}
+            </div>
+          );
+        })}
       {signInNeeded && (
         <div className="notice" role="status">
           Done. Sign out and back in (or restart) for Windows to keep Wi-Fi connected.

@@ -14,6 +14,7 @@ use crate::sys;
 /// Adapters are re-read this often; reading them takes a few milliseconds.
 const REFRESH_EVERY: u64 = 3;
 const SAVE_USAGE_EVERY: u64 = 30;
+const SHARED_LINE_EVERY: u64 = 60;
 
 /// Sends the current status to the popup, if it's open, and to the tray.
 pub fn publish(app: &AppHandle) {
@@ -63,6 +64,12 @@ impl Ticks {
         self.last_total = total;
         if self.n.is_multiple_of(SAVE_USAGE_EVERY) {
             state.save_usage();
+        }
+
+        // Once a minute (and soon after start): which links share a line.
+        if self.n % SHARED_LINE_EVERY == 5 {
+            let links = state.links.clone();
+            tokio::task::spawn_blocking(move || crate::net::links::check_shared_lines(&links));
         }
 
         if self.n.is_multiple_of(REFRESH_EVERY) {

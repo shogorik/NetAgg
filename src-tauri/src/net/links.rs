@@ -111,6 +111,9 @@ pub struct Link {
     pub stats: LinkStats,
     pub health: Mutex<Health>,
     pub rates: Mutex<Rates>,
+    /// Another link whose router this one's path goes through (a phone
+    /// tethering the same Wi-Fi), so both share one internet line.
+    pub shares_line_with: Mutex<Option<String>>,
     meters: Mutex<Vec<Weak<Meter>>>,
 }
 
@@ -128,6 +131,7 @@ impl Link {
                 tx_rate: 0,
                 history: VecDeque::from(vec![(0, 0); HISTORY_LEN]),
             }),
+            shares_line_with: Mutex::new(None),
             meters: Mutex::new(Vec::new()),
         }
     }
@@ -212,6 +216,53 @@ impl Link {
         if h.consecutive_failures >= 2 {
             h.state = HealthState::Down;
             h.latency_ms = None;
+        }
+    }
+}
+
+/// Where the probes for shared lines go: any address past the routers.
+const PATH_PROBE: Ipv4Addr = Ipv4Addr::new(1, 1, 1, 1);
+
+/// The link whose router appears among `hops` (a path's second and third
+/// hops), other than the path's own gateway: that path then reaches the
+/// internet through the other link's router.
+fn shared_with<'a>(
+    hops: &[Ipv4Addr],
+    own_gateway: Option<&str>,
+    others: &[(&'a str, &str)],
+) -> Option<&'a str> {
+    hops.iter()
+        .map(|hop| hop.to_string())
+        .filter(|hop| Some(hop.as_str()) != own_gateway)
+        .find_map(|hop| others.iter().find(|(_, gw)| *gw == hop).map(|(id, _)| *id))
+}
+
+/// Marks every present link whose path runs through another link's router.
+/// Sends two short-lived pings per link and waits up to a second for each.
+/// Blocking.
+pub fn check_shared_lines(links: &Links) {
+    let present = links.present();
+    let gateways: Vec<(String, String)> = present
+        .iter()
+        .filter_map(|l| Some((l.id.clone(), l.info().gateway?)))
+        .collect();
+    for link in &present {
+        let info = link.info();
+        let found = info.ipv4.and_then(|source| {
+            let hops: Vec<Ipv4Addr> = (2..=3)
+                .filter_map(|ttl| sys::icmp_hop(source, PATH_PROBE, ttl, 1000))
+                .collect();
+            let others: Vec<(&str, &str)> = gateways
+                .iter()
+                .filter(|(id, _)| *id != link.id)
+                .map(|(id, gw)| (id.as_str(), gw.as_str()))
+                .collect();
+            shared_with(&hops, info.gateway.as_deref(), &others).map(str::to_owned)
+        });
+        let mut shares = link.shares_line_with.lock().unwrap();
+        if *shares != found {
+            log::info!("{}: shares a line with {found:?}", link.id);
+            *shares = found;
         }
     }
 }
@@ -532,6 +583,61 @@ mod tests {
             present,
             ..test_info()
         }
+    }
+
+    /// Prints the first hops of each network's path. Run with
+    /// `cargo test live_hops -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn live_hops() {
+        let links = Links::default();
+        links.refresh();
+        for link in links.present() {
+            let info = link.info();
+            let Some(src) = info.ipv4 else { continue };
+            let hops: Vec<String> = (1..=3)
+                .map(|ttl| {
+                    sys::icmp_hop(src, std::net::Ipv4Addr::new(1, 1, 1, 1), ttl, 1000)
+                        .map_or("-".into(), |h| h.to_string())
+                })
+                .collect();
+            println!(
+                "{} (gw {:?}): {}",
+                info.name,
+                info.gateway,
+                hops.join(" > ")
+            );
+        }
+    }
+
+    #[test]
+    fn a_phone_on_the_same_wifi_is_found() {
+        let ip = |s: &str| s.parse::<Ipv4Addr>().unwrap();
+        let others = [("wifi", "198.51.100.1")];
+        // The phone's path, as measured on the user's PC.
+        assert_eq!(
+            shared_with(
+                &[ip("198.51.100.1"), ip("10.0.8.40")],
+                Some("10.0.0.2"),
+                &others
+            ),
+            Some("wifi")
+        );
+        // On mobile data the second hop is the carrier's.
+        assert_eq!(
+            shared_with(
+                &[ip("10.64.0.1"), ip("10.64.3.9")],
+                Some("10.0.0.2"),
+                &others
+            ),
+            None
+        );
+        // A link's own gateway doesn't count, nor do lost probes.
+        assert_eq!(
+            shared_with(&[ip("198.51.100.1")], Some("198.51.100.1"), &others),
+            None
+        );
+        assert_eq!(shared_with(&[], Some("10.0.0.2"), &others), None);
     }
 
     #[test]

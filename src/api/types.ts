@@ -19,6 +19,8 @@ export interface LinkStatus {
   osName: string;
   /** Bytes carried for NetAgg, down and up, since it started. */
   totalBytes: number;
+  /** Id of another network whose router this one's path goes through (one internet line). */
+  sharesLineWith: string | null;
   enabled: boolean;
   weight: number;
   /** Bytes per second. */

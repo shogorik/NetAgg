@@ -159,3 +159,16 @@ mod tests {
         }
     }
 }
+
+/// Which router answers `ttl` hops along `source`'s path.
+/// shortcut: not implemented here (needs ICMP time-exceeded from an
+/// unprivileged socket); the shared-line check then finds nothing. Upgrade
+/// with IP_RECVERR (Linux) or a raw socket (root, macOS) when needed.
+pub fn icmp_hop(
+    _source: std::net::Ipv4Addr,
+    _dest: std::net::Ipv4Addr,
+    _ttl: u8,
+    _timeout_ms: u32,
+) -> Option<std::net::Ipv4Addr> {
+    None
+}

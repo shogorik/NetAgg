@@ -3,6 +3,9 @@ use std::net::Ipv4Addr;
 use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::NetworkManagement::IpHelper::*;
 
+/// `IP_TTL_EXPIRED_TRANSIT`: a router on the way answered instead.
+const TTL_EXPIRED: u32 = 11013;
+
 /// Sends an ICMP echo from `source` (which pins it to that interface, so
 /// `if_index` isn't needed) and waits for the reply. Returns the echoed
 /// payload. Blocking.
@@ -53,5 +56,47 @@ pub fn icmp_echo(
         }
         let data = std::slice::from_raw_parts(r.Data as *const u8, r.DataSize as usize);
         Some(data.to_vec())
+    }
+}
+
+/// The address that answers an echo from `source` to `dest` sent with
+/// `ttl`: the router `ttl` hops along that network's path, or `dest`
+/// itself if it's closer. Blocking.
+pub fn icmp_hop(source: Ipv4Addr, dest: Ipv4Addr, ttl: u8, timeout_ms: u32) -> Option<Ipv4Addr> {
+    unsafe {
+        let handle: HANDLE = IcmpCreateFile();
+        if handle == INVALID_HANDLE_VALUE {
+            return None;
+        }
+        let options = IP_OPTION_INFORMATION {
+            Ttl: ttl,
+            Tos: 0,
+            Flags: 0,
+            OptionsSize: 0,
+            OptionsData: std::ptr::null_mut(),
+        };
+        let payload = [0u8; 8];
+        let reply_size = std::mem::size_of::<ICMP_ECHO_REPLY>() + payload.len() + 8 + 64;
+        let mut reply = vec![0u8; reply_size];
+        let n = IcmpSendEcho2Ex(
+            handle,
+            std::ptr::null_mut(),
+            None,
+            std::ptr::null(),
+            u32::from_ne_bytes(source.octets()),
+            u32::from_ne_bytes(dest.octets()),
+            payload.as_ptr().cast(),
+            payload.len() as u16,
+            &options,
+            reply.as_mut_ptr().cast(),
+            reply_size as u32,
+            timeout_ms,
+        );
+        IcmpCloseHandle(handle);
+        if n == 0 {
+            return None;
+        }
+        let r = std::ptr::read_unaligned(reply.as_ptr() as *const ICMP_ECHO_REPLY);
+        (r.Status == 0 || r.Status == TTL_EXPIRED).then(|| Ipv4Addr::from(r.Address.to_ne_bytes()))
     }
 }

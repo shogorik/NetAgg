@@ -64,6 +64,8 @@ pub struct LinkStatus {
     pub os_name: String,
     /// Bytes it has carried for NetAgg, down and up, since NetAgg started.
     pub total_bytes: u64,
+    /// Id of another network whose router this one's path goes through.
+    pub shares_line_with: Option<String>,
     pub enabled: bool,
     pub weight: u32,
     pub rx_rate: u64,
@@ -167,6 +169,7 @@ pub fn build(state: &AppState) -> Status {
                 id: link.id.clone(),
                 name: prefs.label.clone().unwrap_or_else(|| info.display_name()),
                 os_name: info.name.clone(),
+                shares_line_with: link.shares_line_with.lock().unwrap().clone(),
                 total_bytes: link.stats.rx.load(Ordering::Relaxed)
                     + link.stats.tx.load(Ordering::Relaxed),
                 description: info.description,
