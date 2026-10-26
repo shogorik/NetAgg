@@ -59,14 +59,23 @@ fn classify(name: &str, driver: Option<&str>, wireless: bool) -> Option<&'static
 /// The adapter's maker and model from udev's hardware database, such as
 /// "Intel Corporation Wi-Fi 6 AX201".
 /// udev keys it by the interface's number in the host's namespace, so it's
-/// only used when `/sys` agrees that number is this interface: in another
-/// namespace (a test lab) the same number can be a different card.
+/// only used when the host agrees (`host_interface`): in another namespace (a
+/// test lab) the same number can be a different card.
 pub fn adapter_description(if_index: u32) -> Option<String> {
-    let name = interface_name(if_index)?;
-    let sys_index = std::fs::read_to_string(format!("/sys/class/net/{name}/ifindex")).ok()?;
-    (sys_index.trim().parse::<u32>().ok()? == if_index).then_some(())?;
+    host_interface(if_index)?;
     let data = std::fs::read_to_string(format!("/run/udev/data/n{if_index}")).ok()?;
     udev_description(&data)
+}
+
+/// The interface's name, if the host's view (`/sys`, mounted for the host's
+/// network namespace) has the same interface under the same number: true in
+/// the host's namespace, and false from another one, where numbers repeat
+/// and udev and systemd-resolved would mean a different interface. Needs no
+/// privileges (comparing /proc/1/ns/net would need CAP_SYS_PTRACE).
+pub(super) fn host_interface(if_index: u32) -> Option<String> {
+    let name = interface_name(if_index)?;
+    let sys_index = std::fs::read_to_string(format!("/sys/class/net/{name}/ifindex")).ok()?;
+    (sys_index.trim().parse::<u32>().ok()? == if_index).then_some(name)
 }
 
 fn udev_description(data: &str) -> Option<String> {
@@ -99,6 +108,15 @@ mod tests {
         assert_eq!(classify("enp3s0", Some("r8169"), false), Some("ethernet"));
         assert_eq!(classify("bnep0", None, false), Some("other"));
         assert_eq!(classify("wan1", None, false), None);
+    }
+
+    /// The real host: loopback is interface 1, in /sys too. This is the check
+    /// that wrongly failed in the service when it compared /proc/1/ns/net
+    /// (which needs CAP_SYS_PTRACE).
+    #[test]
+    fn the_host_knows_its_own_interfaces() {
+        assert_eq!(host_interface(1).as_deref(), Some("lo"));
+        assert_eq!(host_interface(u32::MAX), None);
     }
 
     #[test]

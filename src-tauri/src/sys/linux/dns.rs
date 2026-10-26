@@ -2,7 +2,7 @@ use std::io;
 use std::net::IpAddr;
 use std::process::Command;
 
-use super::adapters::interface_name;
+use super::adapters::host_interface;
 
 /// Points the adapter at `servers` and makes it the DNS route for every
 /// domain (`~.`), so lookups go through NetAgg too. systemd-resolved
@@ -20,45 +20,29 @@ pub fn set_dns(if_index: u32, servers: &[IpAddr]) -> io::Result<()> {
     }
     // resolved serves the host's namespace and takes the interface by number:
     // from another one (a test lab) it would change some other interface.
-    if !in_host_namespace() {
-        return Err(io::Error::other(
-            "not in the host's network namespace, where systemd-resolved works",
-        ));
-    }
-    let name = interface_name(if_index)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "the adapter is gone"))?;
+    let name = host_interface(if_index).ok_or_else(|| {
+        io::Error::other(
+            "the adapter isn't in the host's network namespace, where systemd-resolved works",
+        )
+    })?;
     let mut dns = vec!["dns".to_owned(), name.clone()];
     dns.extend(servers.iter().map(IpAddr::to_string));
     resolvectl(&dns)?;
     resolvectl(&["domain".to_owned(), name, "~.".to_owned()])
 }
 
-/// Whether this process shares init's network namespace. Unknown counts as
-/// no.
-fn in_host_namespace() -> bool {
-    match (
-        std::fs::read_link("/proc/self/ns/net"),
-        std::fs::read_link("/proc/1/ns/net"),
-    ) {
-        (Ok(own), Ok(host)) => own == host,
-        _ => false,
-    }
-}
-
 /// The network's own DNS servers: systemd-resolved's per-link list, or else
 /// the nameservers in /etc/resolv.conf (which belong to no one network).
 pub fn link_dns_servers(if_index: u32) -> Vec<IpAddr> {
-    let from_resolved = interface_name(if_index)
-        .filter(|_| in_host_namespace())
-        .and_then(|name| {
-            let out = Command::new("resolvectl")
-                .args(["dns", &name])
-                .output()
-                .ok()?;
-            out.status
-                .success()
-                .then(|| parse_resolvectl_dns(&String::from_utf8_lossy(&out.stdout)))
-        });
+    let from_resolved = host_interface(if_index).and_then(|name| {
+        let out = Command::new("resolvectl")
+            .args(["dns", &name])
+            .output()
+            .ok()?;
+        out.status
+            .success()
+            .then(|| parse_resolvectl_dns(&String::from_utf8_lossy(&out.stdout)))
+    });
     match from_resolved {
         Some(servers) if !servers.is_empty() => servers,
         _ => std::fs::read_to_string("/etc/resolv.conf")
