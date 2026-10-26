@@ -58,7 +58,13 @@ fn classify(name: &str, driver: Option<&str>, wireless: bool) -> Option<&'static
 
 /// The adapter's maker and model from udev's hardware database, such as
 /// "Intel Corporation Wi-Fi 6 AX201".
+/// udev keys it by the interface's number in the host's namespace, so it's
+/// only used when `/sys` agrees that number is this interface: in another
+/// namespace (a test lab) the same number can be a different card.
 pub fn adapter_description(if_index: u32) -> Option<String> {
+    let name = interface_name(if_index)?;
+    let sys_index = std::fs::read_to_string(format!("/sys/class/net/{name}/ifindex")).ok()?;
+    (sys_index.trim().parse::<u32>().ok()? == if_index).then_some(())?;
     let data = std::fs::read_to_string(format!("/run/udev/data/n{if_index}")).ok()?;
     udev_description(&data)
 }

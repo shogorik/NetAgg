@@ -3,6 +3,7 @@
 #
 #   scripts/release.sh ["release notes shown in the update prompt"]
 #   scripts/release.sh --macos-from <dir> ["notes"]
+#   scripts/release.sh --linux-from <dir> ["notes"]
 #
 # Run it on Windows (Git Bash), Linux and an Apple silicon Mac in turn, carrying release-assets/
 # from one machine to the next: each run adds its bundles, their .sig files and its entries in
@@ -17,6 +18,15 @@
 #   gh run download --name macos-bundle --dir macos-bundle
 #   scripts/release.sh --macos-from macos-bundle
 #
+# Linux is built on a Linux machine (Ubuntu 24.04, the oldest supported) and signed here, so the key
+# never leaves this machine: copy NetAgg_<version>_amd64.deb (`npm run tauri build`) and
+# netagg-server_<version>_amd64.deb (scripts/build-server-deb.sh) into one folder, then
+#
+#   scripts/release.sh --linux-from <folder>
+#
+# The desktop .deb gets an updater signature and feed entries; netagg-server has no in-app updates
+# and is only added to the assets and SHA256SUMS.
+#
 # The updater key is read from NETAGG_UPDATER_KEY (default ~/.config/netagg/updater.key) by
 # path; it is never printed, copied or put in the environment as text.
 set -euo pipefail
@@ -28,8 +38,12 @@ KEY="${NETAGG_UPDATER_KEY:-$HOME/.config/netagg/updater.key}"
 # store (self-signed is fine for PCs that trust it). Without the file, nothing is Authenticode-signed.
 THUMBPRINT_FILE="${NETAGG_CODESIGN_THUMBPRINT:-$HOME/.config/netagg/codesign.thumbprint}"
 MACOS_FROM=""
+LINUX_FROM=""
 if [[ "${1:-}" == "--macos-from" ]]; then
   MACOS_FROM="${2:?--macos-from needs the artifact directory}"
+  shift 2
+elif [[ "${1:-}" == "--linux-from" ]]; then
+  LINUX_FROM="${2:?--linux-from needs the folder with both .debs}"
   shift 2
 fi
 NOTES="${1:-}"
@@ -65,8 +79,7 @@ case "$(uname -s)" in
     EXTRA=()
     FEED=(
       "linux-x86_64-deb=deb/NetAgg_${VERSION}_amd64.deb"
-      "linux-x86_64-appimage=appimage/NetAgg_${VERSION}_amd64.AppImage"
-      "linux-x86_64=appimage/NetAgg_${VERSION}_amd64.AppImage"
+      "linux-x86_64=deb/NetAgg_${VERSION}_amd64.deb"
     )
     ;;
   MINGW* | MSYS* | CYGWIN*)
@@ -100,6 +113,15 @@ if [[ -n "$MACOS_FROM" ]]; then
   # Signed here, so the key stays on this machine. --app-version puts the version in the trusted
   # comment, as `tauri build` does, which requireSignedVersion checks.
   npx tauri signer sign -f "$KEY" -p "" --app-version "$VERSION" "$archive"
+elif [[ -n "$LINUX_FROM" ]]; then
+  BUNDLE="$LINUX_FROM"
+  EXTRA=("netagg-server_${VERSION}_amd64.deb")
+  FEED=("linux-x86_64-deb=NetAgg_${VERSION}_amd64.deb" "linux-x86_64=NetAgg_${VERSION}_amd64.deb")
+  deb="$BUNDLE/NetAgg_${VERSION}_amd64.deb"
+  [[ -f "$deb" ]] || die "missing $deb"
+  [[ -n "$NATIVE_PATHS" ]] && deb="$(cygpath -w "$deb")"
+  # As for macOS: signed here, with the version in the trusted comment.
+  npx tauri signer sign -f "$KEY" -p "" --app-version "$VERSION" "$deb"
 else
   # CI=true skips the DMG's Finder styling AppleScript, which needs Automation access.
   # `tauri build` takes a key file's path in TAURI_SIGNING_PRIVATE_KEY (it ignores _PATH). The

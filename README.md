@@ -217,8 +217,9 @@ npm run tauri build     # Windows: bundle/nsis/ · Linux: bundle/deb/ and bundle
 ```
 
 **Release:** `scripts/release.sh "what's new"` builds this system's bundles, signs them for the updater with the key at
-`~/.config/netagg/updater.key`, and adds them to `release-assets/latest.json`. Run it in Git Bash on Windows, then
-attach every file in `release-assets/` to the GitHub release `v<version>`. It uploads nothing itself.
+`~/.config/netagg/updater.key`, and adds them to `release-assets/latest.json`. Run it in Git Bash on Windows; the Linux
+packages are built on Linux, then signed on Windows with `scripts/release.sh --linux-from <folder>`. Then attach every file
+in `release-assets/` to the GitHub release `v<version>`. It uploads nothing itself.
 
 **Check before committing:**
 
