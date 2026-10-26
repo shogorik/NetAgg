@@ -1,0 +1,7 @@
+# NetAgg's apt repository, added by the netagg-server package: updates then
+# come with `sudo apt update && sudo apt upgrade` (or unattended-upgrades).
+# Only packages signed with NetAgg's repository key are accepted from it.
+Types: deb
+URIs: https://shogorik.github.io/NetAgg/apt/
+Suites: ./
+Signed-By: /etc/apt/keyrings/netagg-archive-keyring.gpg

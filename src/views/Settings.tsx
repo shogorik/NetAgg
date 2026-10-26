@@ -156,30 +156,33 @@ export function Settings({ status, onStatus, onBack, update }: Props) {
         </Section>
 
         <div className="divider" />
-        {inBrowser ? (
-          <Section title="WebUI">
-            <div className="setting-row">
-              <div className="setting-text">
-                <span className="setting-label">Signed in</span>
-                <span className="setting-desc">
-                  Updates come with the netagg-server package: install the newer .deb on the server.
-                </span>
+        <Section title="Updates">
+          <UpdatePanel status={status} update={update} />
+          <SwitchRow
+            label="Check for updates at start"
+            desc={
+              inBrowser
+                ? "The server asks GitHub for a newer version when this page opens. It never installs anything."
+                : "Asks GitHub for a newer version when NetAgg opens. Never installs without asking."
+            }
+            on={settings.checkUpdates}
+            onChange={(checkUpdates) => change({ checkUpdates })}
+          />
+        </Section>
+        {inBrowser && (
+          <>
+            <div className="divider" />
+            <Section title="WebUI">
+              <div className="setting-row">
+                <div className="setting-text">
+                  <span className="setting-label">Signed in</span>
+                </div>
+                <button type="button" className="secondary-button" onClick={signOut}>
+                  Sign out
+                </button>
               </div>
-              <button type="button" className="secondary-button" onClick={signOut}>
-                Sign out
-              </button>
-            </div>
-          </Section>
-        ) : (
-          <Section title="Updates">
-            <UpdatePanel status={status} update={update} />
-            <SwitchRow
-              label="Check for updates at start"
-              desc="Asks GitHub for a newer version when NetAgg opens. Never installs without asking."
-              on={settings.checkUpdates}
-              onChange={(checkUpdates) => change({ checkUpdates })}
-            />
-          </Section>
+            </Section>
+          </>
         )}
         <div className="bottom-spacer" />
       </div>

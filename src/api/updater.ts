@@ -1,5 +1,6 @@
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent } from "@tauri-apps/plugin-updater";
+import { inBrowser } from "./transport";
 
 /** Where people can always get NetAgg by hand. */
 export const RELEASES_PAGE = "github.com/shogorik/NetAgg/releases";
@@ -66,3 +67,32 @@ export const appUpdater: Updater = {
   },
   restart: relaunch,
 };
+
+/**
+ * netagg-server's WebUI: the server asks GitHub (`POST /update`) and only tells. Installing is the
+ * package manager's job, so there's nothing to install or restart from the page.
+ */
+const webUpdater: Updater = {
+  async check() {
+    const response = await fetch("/update", { method: "POST" });
+    if (!response.ok) throw await response.text();
+    const info = (await response.json()) as {
+      current: string;
+      available: string | null;
+      error: string | null;
+    };
+    if (info.error) throw info.error;
+    if (!info.available) return null;
+    return {
+      version: info.available,
+      notes: null,
+      date: null,
+      install: () => Promise.reject("Install it on the server with apt."),
+      dismiss: () => Promise.resolve(),
+    };
+  },
+  restart: () => Promise.resolve(),
+};
+
+/** The updater for where the popup runs. */
+export const updater: Updater = inBrowser ? webUpdater : appUpdater;

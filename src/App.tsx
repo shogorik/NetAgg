@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { appUpdater } from "./api/updater";
-import { inBrowser } from "./api/transport";
+import { updater } from "./api/updater";
 import { useStatus } from "./api/useStatus";
 import { hidePopup, useFitWindow } from "./api/window";
 import { useUpdater } from "./lib/useUpdater";
@@ -17,7 +16,7 @@ export default function App() {
   // Settings is taller than the main page; it keeps the main page's height and scrolls instead.
   const [homeHeight, setHomeHeight] = useState<number | null>(null);
   // A server's WebUI is updated with its package, not from the page.
-  const update = useUpdater(appUpdater, status && !inBrowser ? status.settings.checkUpdates : null);
+  const update = useUpdater(updater, status ? status.settings.checkUpdates : null);
 
   // Esc goes back a page, and from the first page hides the popup.
   useEffect(() => {

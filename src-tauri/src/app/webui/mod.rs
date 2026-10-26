@@ -10,6 +10,7 @@
 
 mod password;
 mod tls;
+mod update;
 
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -54,6 +55,9 @@ const APP_CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self' '
 const LOGIN_CSP: &str = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; \
     frame-ancestors 'none'; base-uri 'none'";
 
+/// Nothing leaves for other sites; the page's own requests keep their Origin.
+const REFERRER_POLICY: &str = "same-origin";
+
 type Body = Full<Bytes>;
 
 struct Session {
@@ -66,6 +70,7 @@ struct WebUi {
     files: HashMap<String, (Bytes, &'static str)>,
     sessions: Mutex<HashMap<String, Session>>,
     failures: Mutex<HashMap<IpAddr, (u32, Instant)>>,
+    update: Arc<update::UpdateCheck>,
 }
 
 /// Runs until stopped; returns the exit code.
@@ -101,6 +106,7 @@ async fn serve(www: &Path, state_dir: &Path) -> io::Result<()> {
         files: load_files(www)?,
         sessions: Mutex::default(),
         failures: Mutex::default(),
+        update: Arc::default(),
     });
     // One socket for both families.
     let listener = TcpListener::bind((Ipv6Addr::UNSPECIFIED, PORT)).await?;
@@ -172,6 +178,13 @@ impl WebUi {
                 true => self.api(req).await,
                 false => plain(StatusCode::FORBIDDEN, "Cross-site request refused."),
             },
+            (&Method::POST, "/update") => match same_origin(&req) {
+                true => match serde_json::to_vec(&self.update.check().await) {
+                    Ok(json) => with_type(StatusCode::OK, json.into(), "application/json"),
+                    Err(err) => plain(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+                },
+                false => plain(StatusCode::FORBIDDEN, "Cross-site request refused."),
+            },
             (&Method::GET, _) => self.file(&path),
             _ => plain(StatusCode::NOT_FOUND, "Not found."),
         };
@@ -181,7 +194,9 @@ impl WebUi {
             HeaderValue::from_static("nosniff"),
         );
         headers.insert("x-frame-options", HeaderValue::from_static("DENY"));
-        headers.insert("referrer-policy", HeaderValue::from_static("no-referrer"));
+        // Not "no-referrer": with it, browsers send `Origin: null` on every POST,
+        // the page's own included, and `same_origin` refuses them all.
+        headers.insert("referrer-policy", HeaderValue::from_static(REFERRER_POLICY));
         headers
             .entry(header::CACHE_CONTROL)
             .or_insert(HeaderValue::from_static("no-store"));
@@ -554,12 +569,21 @@ mod tests {
         }
     }
 
+    /// Fetch spec, "serializing a request origin": under `no-referrer` (and
+    /// `strict-origin`, … for cross-origin only) a POST's Origin is `null`.
+    /// `same-origin` keeps it for the page's own requests.
+    #[test]
+    fn browsers_keep_the_origin_on_our_own_posts() {
+        assert_eq!(REFERRER_POLICY, "same-origin");
+    }
+
     #[test]
     fn five_tries_then_the_address_waits() {
         let webui = WebUi {
             files: HashMap::new(),
             sessions: Mutex::default(),
             failures: Mutex::default(),
+            update: Arc::default(),
         };
         let guesser = ip("198.51.100.99");
         let tries: Vec<_> = (0..6).map(|_| webui.attempt(guesser)).collect();

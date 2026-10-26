@@ -5,7 +5,13 @@
 #
 #   scripts/build-server-deb.sh
 #
-# The package lands in src-tauri/target/release/bundle/deb/.
+# It also builds netagg-apt_<version>_all.deb, which only adds NetAgg's apt
+# repository and its key: installing it is how a server opts in to updates
+# through apt, so netagg-server itself never touches /etc/apt.
+#
+# Both land in src-tauri/target/release/bundle/deb/, and with them apt/: the
+# packages plus their Packages index, the unsigned half of NetAgg's apt
+# repository (scripts/release.sh --linux-from signs it).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -13,7 +19,8 @@ VERSION="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
 ARCH=amd64
 OUT="src-tauri/target/release/bundle/deb"
 ROOT="$(mktemp -d)"
-trap 'rm -rf "$ROOT"' EXIT
+APT_ROOT="$(mktemp -d)"
+trap 'rm -rf "$ROOT" "$APT_ROOT"' EXIT
 
 npm run build
 (cd src-tauri && cargo build --release --no-default-features --features server --bin netagg-server)
@@ -99,3 +106,40 @@ mkdir -p "$OUT"
 DEB="$OUT/netagg-server_${VERSION}_${ARCH}.deb"
 dpkg-deb --root-owner-group --build "$ROOT" "$DEB"
 echo "$DEB"
+
+# netagg-apt: NetAgg's apt source and the key it's signed with, nothing else.
+# Configuration files: a removal keeps the two together, a purge removes both.
+install -Dm644 src-tauri/linux/netagg.sources "$APT_ROOT/etc/apt/sources.list.d/netagg.sources"
+install -Dm644 src-tauri/linux/netagg-archive-keyring.gpg "$APT_ROOT/etc/apt/keyrings/netagg-archive-keyring.gpg"
+install -Dm644 LICENSE "$APT_ROOT/usr/share/doc/netagg-apt/copyright"
+chmod -R u=rwX,go=rX "$APT_ROOT/etc" "$APT_ROOT/usr"
+install -d "$APT_ROOT/DEBIAN"
+FINGERPRINT="$(gpg --show-keys --with-colons src-tauri/linux/netagg-archive-keyring.gpg | awk -F: '/^fpr/ {print $10; exit}')"
+cat > "$APT_ROOT/DEBIAN/control" <<EOF
+Package: netagg-apt
+Version: $VERSION
+Architecture: all
+Maintainer: shogorik <46198806+shogorik@users.noreply.github.com>
+Installed-Size: $(du -sk "$APT_ROOT/etc" "$APT_ROOT/usr" | awk '{s += $1} END {print s}')
+Section: admin
+Priority: optional
+Homepage: https://github.com/shogorik/NetAgg
+Description: NetAgg's apt repository, for updates with apt upgrade
+ Adds https://shogorik.github.io/NetAgg/apt/ to apt, trusted only with
+ NetAgg's repository key (fingerprint $FINGERPRINT),
+ so new netagg-server versions come with "sudo apt update && sudo apt
+ upgrade". Remove it to stop; purge it to remove the source and the key.
+EOF
+printf '%s\n' /etc/apt/sources.list.d/netagg.sources /etc/apt/keyrings/netagg-archive-keyring.gpg \
+  > "$APT_ROOT/DEBIAN/conffiles"
+APT_DEB="$OUT/netagg-apt_${VERSION}_all.deb"
+dpkg-deb --root-owner-group --build "$APT_ROOT" "$APT_DEB"
+echo "$APT_DEB"
+
+# The repository's package index (flat: no dists/ tree), for release.sh to sign.
+# netagg-apt is in it too, so a new key or address can reach servers through it.
+rm -rf "$OUT/apt"
+mkdir -p "$OUT/apt"
+cp "$DEB" "$APT_DEB" "$OUT/apt/"
+(cd "$OUT/apt" && dpkg-scanpackages --multiversion . /dev/null > Packages 2>/dev/null && gzip -9kn Packages)
+echo "$OUT/apt"

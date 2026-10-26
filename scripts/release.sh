@@ -18,14 +18,17 @@
 #   gh run download --name macos-bundle --dir macos-bundle
 #   scripts/release.sh --macos-from macos-bundle
 #
-# Linux is built on a Linux machine (Ubuntu 24.04, the oldest supported) and signed here, so the key
-# never leaves this machine: copy NetAgg_<version>_amd64.deb (`npm run tauri build`) and
-# netagg-server_<version>_amd64.deb (scripts/build-server-deb.sh) into one folder, then
+# Linux is built on a Linux machine (Ubuntu 24.04, the oldest supported) and signed here, so the keys
+# never leave this machine: copy the build's bundle/deb/ folder (NetAgg_<version>_amd64.deb from
+# `npm run tauri build`; netagg-server_<version>_amd64.deb and apt/ from scripts/build-server-deb.sh)
+# here, then
 #
 #   scripts/release.sh --linux-from <folder>
 #
-# The desktop .deb gets an updater signature and feed entries; netagg-server has no in-app updates
-# and is only added to the assets and SHA256SUMS.
+# The desktop .deb gets an updater signature and feed entries. netagg-server and netagg-apt (which
+# only adds the apt repository) have no in-app updates: they're added to the assets and SHA256SUMS,
+# and apt-repo/ becomes NetAgg's apt repository, its Release signed with the repository key
+# (NETAGG_APT_GNUPG, default ~/.config/netagg/apt-gnupg).
 #
 # The updater key is read from NETAGG_UPDATER_KEY (default ~/.config/netagg/updater.key) by
 # path; it is never printed, copied or put in the environment as text.
@@ -115,7 +118,7 @@ if [[ -n "$MACOS_FROM" ]]; then
   npx tauri signer sign -f "$KEY" -p "" --app-version "$VERSION" "$archive"
 elif [[ -n "$LINUX_FROM" ]]; then
   BUNDLE="$LINUX_FROM"
-  EXTRA=("netagg-server_${VERSION}_amd64.deb")
+  EXTRA=("netagg-server_${VERSION}_amd64.deb" "netagg-apt_${VERSION}_all.deb")
   FEED=("linux-x86_64-deb=NetAgg_${VERSION}_amd64.deb" "linux-x86_64=NetAgg_${VERSION}_amd64.deb")
   deb="$BUNDLE/NetAgg_${VERSION}_amd64.deb"
   [[ -f "$deb" ]] || die "missing $deb"
@@ -174,6 +177,38 @@ VERSION="$VERSION" NOTES="$NOTES" BASE="https://github.com/$REPO/releases/downlo
     }
     fs.writeFileSync(path, JSON.stringify(feed, null, 2) + "\n");
   ' "${ENTRIES[@]}"
+
+if [[ -n "$LINUX_FROM" ]]; then
+  # NetAgg's apt repository (published on GitHub Pages by scripts/publish-apt.sh): the
+  # build's package and index, plus a Release file signed here with the repository key.
+  APT_OUT="apt-repo"
+  APT_GNUPG="${NETAGG_APT_GNUPG:-$HOME/.config/netagg/apt-gnupg}"
+  KEYRING="src-tauri/linux/netagg-archive-keyring.gpg"
+  [[ -f "$LINUX_FROM/apt/Packages" ]] || die "missing $LINUX_FROM/apt/Packages (scripts/build-server-deb.sh makes it)"
+  # The package trusts the key in the keyring file; signing with any other gives a repository
+  # apt refuses.
+  cmp -s <(GNUPGHOME="$APT_GNUPG" gpg --export) "$KEYRING" \
+    || die "$KEYRING isn't the public half of the key in $APT_GNUPG"
+  rm -rf "$APT_OUT"
+  mkdir -p "$APT_OUT"
+  cp "$LINUX_FROM"/apt/* "$APT_OUT/"
+  cp "$KEYRING" "$APT_OUT/"
+  (
+    cd "$APT_OUT"
+    echo "Origin: NetAgg"
+    echo "Label: NetAgg"
+    echo "Architectures: amd64"
+    echo "Date: $(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S UTC')"
+    echo "SHA256:"
+    for f in Packages Packages.gz; do
+      echo " $(sha256sum "$f" | cut -d' ' -f1) $(wc -c < "$f" | tr -d ' ') $f"
+    done
+  ) > "$APT_OUT/Release"
+  GNUPGHOME="$APT_GNUPG" gpg --batch --yes --quiet --clearsign -o "$APT_OUT/InRelease" "$APT_OUT/Release"
+  GNUPGHOME="$APT_GNUPG" gpg --batch --yes --quiet --armor --detach-sign -o "$APT_OUT/Release.gpg" "$APT_OUT/Release"
+  echo "release: apt repository in $APT_OUT/ (publish with scripts/publish-apt.sh):"
+  ls -l "$APT_OUT"
+fi
 
 if command -v sha256sum > /dev/null; then sum=(sha256sum); else sum=(shasum -a 256); fi
 (cd "$OUT" && rm -f SHA256SUMS && "${sum[@]}" * > SHA256SUMS)

@@ -1,3 +1,4 @@
+import { inBrowser } from "../api/transport";
 import type { Status } from "../api/types";
 import { RELEASES_PAGE } from "../api/updater";
 import { formatBytes } from "../lib/format";
@@ -39,6 +40,22 @@ export function UpdatePanel({ status, update }: Props) {
       );
     }
     case "available":
+      // A server's WebUI only tells: the package manager installs.
+      if (inBrowser) {
+        return (
+          <div className="setting-row stacked">
+            <Text
+              title={`NetAgg ${state.version} is available`}
+              desc={`You have ${current}. On the server, run “sudo apt update && sudo apt upgrade” if netagg-apt is installed, or install netagg-server_${state.version}_amd64.deb from ${RELEASES_PAGE}.`}
+            />
+            <div className="update-actions">
+              <button type="button" className="secondary-button" onClick={update.dismiss}>
+                OK
+              </button>
+            </div>
+          </div>
+        );
+      }
       return (
         <div className="setting-row stacked">
           <Text

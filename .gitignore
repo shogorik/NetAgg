@@ -10,3 +10,4 @@ src-tauri/gen/schemas/
 updater.key*
 # Built release assets (scripts/release.sh).
 release-assets/
+apt-repo/
