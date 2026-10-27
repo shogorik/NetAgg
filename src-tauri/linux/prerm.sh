@@ -4,7 +4,11 @@
 set -e
 if [ -d /run/systemd/system ]; then
     case "$1" in
-        remove|deconfigure) systemctl disable --now netagg.service || true ;;
+        remove|deconfigure)
+            systemctl disable --now netagg.service || true
+            # Every user's tray app (the service has stopped, so any netagg left is one).
+            pkill -x netagg || true
+            ;;
         upgrade) systemctl stop netagg.service || true ;;
     esac
 fi

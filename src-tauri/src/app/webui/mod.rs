@@ -32,7 +32,7 @@ use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
 use super::control::{Request, NEEDS_ADMIN};
-use super::service;
+use super::{service, status};
 
 pub use password::{run as run_password, PASSWORD_ARG};
 
@@ -354,6 +354,11 @@ impl WebUi {
             return plain(StatusCode::PAYLOAD_TOO_LARGE, "Too large.");
         };
         let reply = match serde_json::from_slice::<Request>(&body) {
+            // As the desktop app does: the page shows why, instead of waiting.
+            Ok(Request::Status) => match service::send(&Request::Status).await {
+                Err(err) => serde_json::to_value(status::offline(err)).map_err(|e| e.to_string()),
+                reply => reply,
+            },
             Ok(request) if request.needs_admin() && !approved => Err(NEEDS_ADMIN.to_owned()),
             Ok(request) => service::send(&request).await,
             Err(err) => Err(format!("not a request: {err}")),

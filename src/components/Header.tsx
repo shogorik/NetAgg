@@ -34,7 +34,7 @@ export function Header({ on, status, dot, disabled, onToggle, onMinimize }: Prop
 
 interface SubProps {
   title: string;
-  onBack: () => void;
+  onBack?: () => void;
   onMinimize?: () => void;
   children?: ReactNode;
 }
@@ -43,7 +43,7 @@ interface SubProps {
 export function SubHeader({ title, onBack, onMinimize, children }: SubProps) {
   return (
     <header className="header sub">
-      <IconButton icon={ChevronLeft} label="Back" size={18} strong onClick={onBack} />
+      {onBack && <IconButton icon={ChevronLeft} label="Back" size={18} strong onClick={onBack} />}
       <span className="header-title">{title}</span>
       {children}
       <span className="header-spacer" />

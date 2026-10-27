@@ -24,7 +24,10 @@ pub mod status;
 #[cfg(feature = "gui")]
 pub mod ticker;
 pub mod ticks;
-#[cfg(feature = "gui")]
+#[cfg(all(feature = "gui", not(target_os = "linux")))]
+pub mod tray;
+#[cfg(all(feature = "gui", target_os = "linux"))]
+#[path = "tray_linux.rs"]
 pub mod tray;
 pub mod usage;
 #[cfg(all(feature = "server", target_os = "linux"))]

@@ -21,7 +21,8 @@ import type { UpdateControls } from "../lib/useUpdater";
 interface Props {
   status: Status;
   onStatus: (status: Status) => void;
-  onBack: () => void;
+  /** Left out where Settings has its own column (a wide browser window). */
+  onBack?: () => void;
   update: UpdateControls;
 }
 
@@ -139,7 +140,7 @@ export function Settings({ status, onStatus, onBack, update }: Props) {
         <div className="divider" />
         <Section title="DNS">
           <SwitchRow
-            label="Use each network's own DNS"
+            label={`Use each network's own DNS (${settings.dnsMode === "auto" ? "Auto" : "Manual"})`}
             desc="Lookups go to the servers each network hands out (usually its router), through that network."
             on={settings.dnsMode === "auto"}
             onChange={(auto) => change({ dnsMode: auto ? "auto" : "manual" })}

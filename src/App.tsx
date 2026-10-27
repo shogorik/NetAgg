@@ -11,10 +11,26 @@ import { Settings } from "./views/Settings";
 
 type View = "main" | "settings" | "connections";
 
+/** In a browser at least this wide, the main page and Settings sit side by side. */
+const WIDE = "(min-width: 820px)";
+
+function useWide(): boolean {
+  const [wide, setWide] = useState(() => inBrowser && window.matchMedia(WIDE).matches);
+  useEffect(() => {
+    if (!inBrowser) return;
+    const query = window.matchMedia(WIDE);
+    const onChange = () => setWide(query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  return wide;
+}
+
 export default function App() {
   const ref = useFitWindow<HTMLDivElement>();
   const [status, setStatus] = useStatus();
   const [view, setView] = useState<View>("main");
+  const wide = useWide();
   // Settings is taller than the main page; it keeps the main page's height and scrolls instead.
   const [homeHeight, setHomeHeight] = useState<number | null>(null);
   // A server's WebUI is updated with its package, not from the page.
@@ -37,6 +53,31 @@ export default function App() {
     setView("settings");
   };
   const fixedHeight = view === "settings" && homeHeight ? { height: homeHeight } : undefined;
+
+  // A wide browser window shows Settings beside the main page instead of in its place.
+  if (wide && status) {
+    return (
+      <div className="web-columns">
+        <PasswordPrompt />
+        <div className="popup">
+          {view === "connections" ? (
+            <Connections status={status} onBack={back} />
+          ) : (
+            <Main
+              status={status}
+              onStatus={setStatus}
+              onSettings={() => {}}
+              onConnections={() => setView("connections")}
+              update={update.state}
+            />
+          )}
+        </div>
+        <div className="popup">
+          <Settings status={status} onStatus={setStatus} update={update} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className="popup" style={fixedHeight}>

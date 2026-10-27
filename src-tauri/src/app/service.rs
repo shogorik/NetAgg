@@ -21,9 +21,9 @@ use tokio::net::windows::named_pipe::ClientOptions;
 #[cfg(feature = "gui")]
 use super::control::NEEDS_ADMIN;
 use super::control::{self, Caller, Request};
-use super::state::AppState;
 #[cfg(windows)]
 use super::logfile;
+use super::state::AppState;
 use super::ticks::Ticks;
 use crate::net::health;
 use crate::{engine, sys};

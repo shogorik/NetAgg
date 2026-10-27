@@ -118,7 +118,10 @@ button.chip:hover {
   gap: 8px;
   padding: 16px;
   border-radius: var(--radius);
-  background: var(--surface);
+  border: 1px solid var(--border);
+  /* Opaque: the page behind mustn't show through. */
+  background: #2b2b2b;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.5);
 }
 
 .password-prompt-buttons {
@@ -920,4 +923,26 @@ html.web #root {
 
 html.web .popup {
   width: 100%;
+}
+
+/* A wide browser window: the main page and Settings side by side */
+@media (min-width: 820px) {
+  html.web #root:has(.web-columns) {
+    width: min(760px, calc(100vw - 32px));
+    border-radius: 0;
+    overflow: visible;
+  }
+}
+
+.web-columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.web-columns > .popup {
+  flex: 1;
+  min-width: 0;
+  border-radius: 8px;
+  overflow: hidden;
 }

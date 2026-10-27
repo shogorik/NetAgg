@@ -281,9 +281,8 @@ fn arp_flux(links: &[LinkStatus], prone: impl Fn(&str) -> bool) -> Vec<String> {
     links
         .iter()
         .filter(|l| {
-            router(l).is_some_and(|gw| {
-                links.iter().filter(|o| router(o) == Some(gw)).count() > 1
-            }) && prone(&l.os_name)
+            router(l).is_some_and(|gw| links.iter().filter(|o| router(o) == Some(gw)).count() > 1)
+                && prone(&l.os_name)
         })
         .map(|l| l.name.clone())
         .collect()
@@ -306,7 +305,7 @@ fn settings_status(settings: &Settings) -> SettingsStatus {
 
 /// What the popup shows when the engine can't be asked (Windows: the
 /// service isn't running), with the reason as the error.
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", all(feature = "server", target_os = "linux")))]
 pub fn offline(error: String) -> Status {
     Status {
         platform: std::env::consts::OS,

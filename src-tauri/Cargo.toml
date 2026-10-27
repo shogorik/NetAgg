@@ -24,7 +24,7 @@ required-features = ["server"]
 
 [features]
 default = ["gui"]
-gui = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-updater", "dep:tauri-plugin-process"]
+gui = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-updater", "dep:tauri-plugin-process", "dep:ksni"]
 server = ["dep:argon2", "dep:rcgen", "hyper/server"]
 
 [build-dependencies]
@@ -79,6 +79,11 @@ windows-sys = { version = "0.61", features = [
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 libc = "0.2"
+
+# The Linux tray as a StatusNotifierItem: GNOME's AppIndicator tray then reports a
+# left click (Tauri's libappindicator tray only ever opens the menu).
+[target.'cfg(target_os = "linux")'.dependencies]
+ksni = { version = "0.3.7", optional = true }
 
 [dev-dependencies]
 # What the updater plugin verifies downloads with, to check release assets the same way.

@@ -1,6 +1,5 @@
 //! The notification-area (macOS: menu bar) icon: a left click toggles the
-//! popup, a right click opens a small menu. Linux trays (AppIndicator) open the menu on any click
-//! and don't report clicks, so there the menu's "Open" shows the popup.
+//! popup, a right click opens a small menu. Linux has its own: `tray_linux.rs`.
 
 use std::sync::Mutex;
 use tauri::image::Image;
