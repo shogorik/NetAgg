@@ -3,7 +3,8 @@
 //! as its own user, without root or capabilities, and forwards each request
 //! of a signed-in browser to the NetAgg service over its control socket.
 //! The service counts this user as administrator, so the WebUI is the
-//! boundary: no session, no request.
+//! boundary: no session, no request; and a change only an administrator may
+//! make (DNS) needs the password typed again, as the desktop asks polkit.
 //!
 //! Only this machine, its own networks and private or Tailscale addresses
 //! are answered; the internet never gets as far as the sign-in page.
@@ -30,7 +31,7 @@ use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
-use super::control::Request;
+use super::control::{Request, NEEDS_ADMIN};
 use super::service;
 
 pub use password::{run as run_password, PASSWORD_ARG};
@@ -47,6 +48,11 @@ const MAX_BODY: usize = 64 * 1024;
 /// Failed sign-ins from one address before it has to wait.
 const MAX_FAILURES: u32 = 5;
 const FAILURE_WINDOW: Duration = Duration::from_secs(5 * 60);
+/// How long one approval covers further administrator changes (polkit's
+/// `auth_admin_keep` is five minutes too).
+const APPROVAL: Duration = Duration::from_secs(5 * 60);
+
+const TOO_MANY: &str = "Too many wrong passwords. Wait a few minutes, then try again.";
 
 /// The popup is a single page; nothing is loaded from elsewhere.
 const APP_CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
@@ -64,6 +70,9 @@ struct Session {
     last_seen: Instant,
     /// The password's hash when it was opened: a new password ends it.
     hash: String,
+    /// Changes that need an administrator are let through until then: the
+    /// password asked again, as polkit asks on the desktop.
+    approved_until: Option<Instant>,
 }
 
 struct WebUi {
@@ -161,7 +170,9 @@ impl WebUi {
             (&Method::POST, "/logout") => {
                 if same_origin(&req) {
                     if let Some(token) = session_cookie(&req) {
-                        self.sessions.lock().unwrap().remove(&token);
+                        if self.sessions.lock().unwrap().remove(&token).is_some() {
+                            log::info!("signed out from {client}");
+                        }
                     }
                 }
                 let mut response = redirect("/login");
@@ -176,6 +187,10 @@ impl WebUi {
             },
             (&Method::POST, "/api") => match same_origin(&req) {
                 true => self.api(req).await,
+                false => plain(StatusCode::FORBIDDEN, "Cross-site request refused."),
+            },
+            (&Method::POST, "/approve") => match same_origin(&req) {
+                true => self.approve(req, client).await,
                 false => plain(StatusCode::FORBIDDEN, "Cross-site request refused."),
             },
             (&Method::POST, "/update") => match same_origin(&req) {
@@ -222,31 +237,49 @@ impl WebUi {
         }
     }
 
-    async fn login(&self, req: HttpRequest<Incoming>, client: IpAddr) -> Response<Body> {
+    /// Checks a password typed at `client`, counting wrong ones towards the
+    /// wait. The stored hash if it's right, or what to tell the user.
+    async fn check_password(&self, client: IpAddr, given: String) -> Result<String, &'static str> {
         // Counted before the check, so guesses sent in parallel can't get past the limit.
         let Some(attempt) = self.attempt(client) else {
-            return login_page(Some(
-                "Too many wrong passwords. Wait a few minutes, then try again.",
-            ));
+            log::warn!("refused a password from {client}: it has to wait after wrong ones");
+            return Err(TOO_MANY);
         };
         let Some(hash) = password::stored() else {
-            return login_page(None);
+            return Err("No WebUI password has been set.");
         };
-        let Some(form) = read_body(req).await else {
-            return plain(StatusCode::PAYLOAD_TOO_LARGE, "Too large.");
-        };
-        let given = form_value(&form, "password").unwrap_or_default();
         let checked = hash.clone();
         let ok = tokio::task::spawn_blocking(move || password::verify(&given, &checked))
             .await
             .unwrap_or(false);
         if !ok {
             log::warn!("wrong WebUI password from {client} ({attempt} in a row)");
+            if attempt == MAX_FAILURES {
+                log::warn!(
+                    "{client} must wait {} minutes before trying again",
+                    FAILURE_WINDOW.as_secs() / 60
+                );
+            }
             // Wrong guesses cost time too.
             tokio::time::sleep(Duration::from_secs(1)).await;
-            return login_page(Some("That password isn't right."));
+            return Err("That password isn't right.");
         }
         self.failures.lock().unwrap().remove(&client);
+        Ok(hash)
+    }
+
+    async fn login(&self, req: HttpRequest<Incoming>, client: IpAddr) -> Response<Body> {
+        if password::stored().is_none() {
+            return login_page(None);
+        }
+        let Some(form) = read_body(req).await else {
+            return plain(StatusCode::PAYLOAD_TOO_LARGE, "Too large.");
+        };
+        let given = form_value(&form, "password").unwrap_or_default();
+        let hash = match self.check_password(client, given).await {
+            Ok(hash) => hash,
+            Err(message) => return login_page(Some(message)),
+        };
         let token = match new_token() {
             Ok(token) => token,
             Err(err) => return plain(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
@@ -256,6 +289,7 @@ impl WebUi {
             Session {
                 last_seen: Instant::now(),
                 hash,
+                approved_until: None,
             },
         );
         log::info!("signed in from {client}");
@@ -279,12 +313,48 @@ impl WebUi {
         Some(entry.0)
     }
 
-    /// One request for the service, as the popup would send it.
+    /// The password typed again for a change that needs an administrator:
+    /// approves this session's such changes for `APPROVAL`.
+    async fn approve(&self, req: HttpRequest<Incoming>, client: IpAddr) -> Response<Body> {
+        let token = session_cookie(&req);
+        let Some(body) = read_body(req).await else {
+            return plain(StatusCode::PAYLOAD_TOO_LARGE, "Too large.");
+        };
+        let given = serde_json::from_slice::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|v| v["password"].as_str().map(str::to_owned))
+            .unwrap_or_default();
+        if let Err(message) = self.check_password(client, given).await {
+            return plain(StatusCode::FORBIDDEN, message);
+        }
+        let mut sessions = self.sessions.lock().unwrap();
+        match token.and_then(|t| sessions.get_mut(&t)) {
+            Some(session) => {
+                session.approved_until = Some(Instant::now() + APPROVAL);
+                log::info!("administrator changes approved from {client}");
+                plain(StatusCode::OK, "Approved.")
+            }
+            None => plain(StatusCode::UNAUTHORIZED, "Sign in first."),
+        }
+    }
+
+    fn approved(&self, req: &HttpRequest<Incoming>) -> bool {
+        let sessions = self.sessions.lock().unwrap();
+        session_cookie(req)
+            .and_then(|t| sessions.get(&t).and_then(|s| s.approved_until))
+            .is_some_and(|until| Instant::now() < until)
+    }
+
+    /// One request for the service, as the popup would send it. One that
+    /// needs an administrator gets the service's own refusal until the
+    /// password has been typed again, and the page asks for it.
     async fn api(&self, req: HttpRequest<Incoming>) -> Response<Body> {
+        let approved = self.approved(&req);
         let Some(body) = read_body(req).await else {
             return plain(StatusCode::PAYLOAD_TOO_LARGE, "Too large.");
         };
         let reply = match serde_json::from_slice::<Request>(&body) {
+            Ok(request) if request.needs_admin() && !approved => Err(NEEDS_ADMIN.to_owned()),
             Ok(request) => service::send(&request).await,
             Err(err) => Err(format!("not a request: {err}")),
         };

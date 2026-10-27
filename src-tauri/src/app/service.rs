@@ -22,7 +22,9 @@ use tokio::net::windows::named_pipe::ClientOptions;
 use super::control::NEEDS_ADMIN;
 use super::control::{self, Caller, Request};
 use super::state::AppState;
-use super::{logfile, ticks::Ticks};
+#[cfg(windows)]
+use super::logfile;
+use super::ticks::Ticks;
 use crate::net::health;
 use crate::{engine, sys};
 
@@ -35,11 +37,13 @@ pub const PREPARE_DATA_DIR_ARG: &str = "--prepare-data-dir";
 /// (the DNS block outlives it on Linux).
 #[cfg(target_os = "linux")]
 pub const CLEAN_UP_ARG: &str = "--clean-up";
-/// Followed by a request, hex-encoded JSON.
+/// Followed by a request, hex-encoded JSON, or by `-` to read it from
+/// standard input (Linux: pkexec's command line shows in every user's
+/// process list and in the journal).
 pub const ADMIN_REQUEST_ARG: &str = "--admin-request";
 /// More than any request needs.
 const MAX_REQUEST: u64 = 64 * 1024;
-/// Turning on, or restarting for new DNS servers, takes a few seconds.
+/// Turning on takes a few seconds.
 const CALL_TIMEOUT: Duration = Duration::from_secs(60);
 #[cfg(windows)]
 const ERROR_PIPE_BUSY: i32 = 231;
@@ -101,7 +105,14 @@ async fn serve(stop: impl std::future::Future<Output = ()>) -> u32 {
         eprintln!("unsafe data folder {}: {err}", data_dir.display());
         return 3;
     }
+    #[cfg(windows)]
     logfile::init(&data_dir);
+    // systemd keeps stderr in the journal: `journalctl -u netagg`.
+    #[cfg(target_os = "linux")]
+    {
+        log::set_logger(&super::headless::StderrLog).ok();
+        log::set_max_level(log::LevelFilter::Info);
+    }
     log::info!(
         "NetAgg service {} started from {:?}",
         env!("CARGO_PKG_VERSION"),
@@ -321,12 +332,22 @@ pub async fn call(request: Request) -> Result<Value, String> {
     match send(&request).await {
         Err(err) if err == NEEDS_ADMIN && request.needs_admin() => {
             let line = serde_json::to_string(&request).map_err(|e| e.to_string())?;
-            let args = format!("{ADMIN_REQUEST_ARG} {}", hex(line.as_bytes()));
             let exe = std::env::current_exe().map_err(|e| e.to_string())?;
             #[cfg(target_os = "linux")]
             let exe = sys::without_deleted(exe);
             let code = tokio::task::spawn_blocking(move || {
-                sys::run_elevated(&exe.to_string_lossy(), &args)
+                #[cfg(target_os = "linux")]
+                return sys::run_elevated(
+                    &exe.to_string_lossy(),
+                    &format!("{ADMIN_REQUEST_ARG} -"),
+                    &hex(line.as_bytes()),
+                );
+                // An elevated process's command line is hidden from other users.
+                #[cfg(not(target_os = "linux"))]
+                sys::run_elevated(
+                    &exe.to_string_lossy(),
+                    &format!("{ADMIN_REQUEST_ARG} {}", hex(line.as_bytes())),
+                )
             })
             .await
             .map_err(|e| e.to_string())?
@@ -388,7 +409,11 @@ pub fn run_admin_request(args: &[String]) -> i32 {
         .iter()
         .skip_while(|a| *a != ADMIN_REQUEST_ARG)
         .nth(1)
-        .and_then(|h| unhex(h))
+        .and_then(|h| match h.as_str() {
+            "-" => read_stdin_line(),
+            _ => Some(h.clone()),
+        })
+        .and_then(|h| unhex(h.trim()))
         .and_then(|bytes| serde_json::from_slice::<Request>(&bytes).ok())
         .filter(Request::needs_admin)
     else {
@@ -401,6 +426,18 @@ pub fn run_admin_request(args: &[String]) -> i32 {
         Ok(_) => 0,
         Err(_) => 1,
     }
+}
+
+/// One line from standard input, at most `MAX_REQUEST` bytes.
+fn read_stdin_line() -> Option<String> {
+    use std::io::{BufRead, Read};
+    let mut line = String::new();
+    std::io::stdin()
+        .lock()
+        .take(2 * MAX_REQUEST + 2)
+        .read_line(&mut line)
+        .ok()?;
+    Some(line)
 }
 
 #[cfg(any(feature = "gui", test))]

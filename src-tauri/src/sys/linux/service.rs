@@ -35,7 +35,7 @@ pub fn service_data_dir() -> Option<PathBuf> {
 pub fn prepare_data_dir(dir: &Path) -> io::Result<()> {
     if std::fs::symlink_metadata(dir).is_err() {
         std::fs::create_dir_all(dir)?;
-        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o755))?;
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
     }
     let meta = std::fs::symlink_metadata(dir)?;
     if !meta.is_dir() || !root_only(&meta) {
@@ -175,16 +175,23 @@ pub fn control_socket_trusted() -> io::Result<bool> {
     Ok(dir_meta.is_dir() && root_only(&dir_meta) && meta.uid() == 0)
 }
 
-/// Runs `program args` as root after the polkit password dialog and waits
-/// for it. An error means it never ran: the dialog was dismissed, or the
-/// user may not approve it.
+/// Runs `program args` as root after the polkit password dialog, with
+/// `input` as its standard input, and waits for it. An error means it never
+/// ran: the dialog was dismissed, or the user may not approve it.
 #[cfg(feature = "gui")]
-pub fn run_elevated(program: &str, args: &str) -> io::Result<u32> {
-    let status = std::process::Command::new("pkexec")
+pub fn run_elevated(program: &str, args: &str, input: &str) -> io::Result<u32> {
+    use std::io::Write;
+    let mut child = std::process::Command::new("pkexec")
         .arg(program)
         .args(args.split_whitespace())
-        .status()
+        .stdin(std::process::Stdio::piped())
+        .spawn()
         .map_err(|err| io::Error::new(err.kind(), format!("couldn't run pkexec: {err}")))?;
+    // A pipe holds far more than a request, so this doesn't wait for the dialog.
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = writeln!(stdin, "{input}");
+    }
+    let status = child.wait()?;
     match status.code() {
         // pkexec's own: not authorised or dismissed (126), or no such program (127).
         Some(126 | 127) | None => Err(io::Error::new(

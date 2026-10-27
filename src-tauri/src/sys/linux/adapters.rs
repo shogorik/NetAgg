@@ -67,15 +67,37 @@ pub fn adapter_description(if_index: u32) -> Option<String> {
     udev_description(&data)
 }
 
-/// The interface's name, if the host's view (`/sys`, mounted for the host's
-/// network namespace) has the same interface under the same number: true in
-/// the host's namespace, and false from another one, where numbers repeat
-/// and udev and systemd-resolved would mean a different interface. Needs no
-/// privileges (comparing /proc/1/ns/net would need CAP_SYS_PTRACE).
+/// The interface's name, if this process is in the host's network namespace,
+/// where udev and systemd-resolved number interfaces as it does. From another
+/// one (a test lab) numbers repeat, and resolved would change some other
+/// interface of the host's. Needs no privileges (comparing /proc/1/ns/net
+/// would need CAP_SYS_PTRACE).
 pub(super) fn host_interface(if_index: u32) -> Option<String> {
+    if in_named_netns() {
+        return None;
+    }
     let name = interface_name(if_index)?;
+    // Where /sys shows the host's interfaces, it also catches an unnamed namespace.
     let sys_index = std::fs::read_to_string(format!("/sys/class/net/{name}/ifindex")).ok()?;
     (sys_index.trim().parse::<u32>().ok()? == if_index).then_some(name)
+}
+
+/// Whether this process is in a namespace `ip netns` made: its /run/netns
+/// entry is the same file as /proc/self/ns/net. /sys alone didn't tell: a
+/// lab unit (`NetworkNamespacePath=`) saw the lab's interfaces there, and
+/// resolved set the host's tailscale0, which had the adapter's number.
+/// Unreadable counts as yes: then nothing of the host's is changed.
+fn in_named_netns() -> bool {
+    use std::os::unix::fs::MetadataExt;
+    let Ok(own) = std::fs::metadata("/proc/self/ns/net") else {
+        return true;
+    };
+    std::fs::read_dir("/run/netns")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| std::fs::metadata(entry.path()).ok())
+        .any(|ns| ns.dev() == own.dev() && ns.ino() == own.ino())
 }
 
 fn udev_description(data: &str) -> Option<String> {
@@ -115,6 +137,7 @@ mod tests {
     /// (which needs CAP_SYS_PTRACE).
     #[test]
     fn the_host_knows_its_own_interfaces() {
+        assert!(!in_named_netns());
         assert_eq!(host_interface(1).as_deref(), Some("lo"));
         assert_eq!(host_interface(u32::MAX), None);
     }

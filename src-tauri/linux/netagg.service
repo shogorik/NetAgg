@@ -12,9 +12,11 @@ ExecStart=/usr/bin/netagg --service
 ExecStopPost=/usr/bin/netagg --clean-up
 Restart=on-failure
 RestartSec=5
-# Settings, usage and the log; the control socket.
+# Settings and usage, root's only: DNS servers can carry a private account ID.
+# The control socket's folder stays open, as every user may ask the service.
 StateDirectory=netagg
-StateDirectoryMode=0755
+StateDirectoryMode=0700
+UMask=0077
 RuntimeDirectory=netagg
 RuntimeDirectoryMode=0755
 

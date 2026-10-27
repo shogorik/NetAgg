@@ -137,6 +137,16 @@ impl Flows {
         flows.iter().filter(|f| f.lose()).count()
     }
 
+    /// Closes every flow to `port`, on any server. Returns how many.
+    pub fn abort_to_port(&self, port: u16) -> usize {
+        let flows: Vec<Arc<Flow>> = self
+            .snapshot()
+            .into_iter()
+            .filter(|f| f.dst.port() == port)
+            .collect();
+        flows.iter().filter(|f| f.lose()).count()
+    }
+
     /// Closes TCP flows idle for at least `idle` on every link but
     /// `link_id`, so their apps reconnect and the balancer places them again
     /// now that `link_id` is there too. Busy flows stay where they are.

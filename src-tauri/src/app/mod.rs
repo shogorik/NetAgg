@@ -12,6 +12,7 @@ pub mod backend;
 pub mod commands;
 pub mod control;
 pub mod headless;
+#[cfg(any(windows, feature = "gui"))]
 pub mod logfile;
 #[cfg(feature = "gui")]
 pub mod popup;

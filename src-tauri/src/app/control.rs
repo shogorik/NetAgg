@@ -257,11 +257,10 @@ async fn set_option(state: &AppState, change: OptionChange, caller: Caller) -> R
         }
     });
     let after = state.settings();
-    // The resolver and the DNS guard are set up as the engine starts.
     if (before.dns_mode, &before.dns, before.enforce_dns)
         != (after.dns_mode, &after.dns, after.enforce_dns)
     {
-        state.restart().await?;
+        state.apply_dns().await?;
     }
     Ok(())
 }

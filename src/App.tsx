@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { inBrowser } from "./api/transport";
 import { updater } from "./api/updater";
+import { PasswordPrompt } from "./components/PasswordPrompt";
 import { useStatus } from "./api/useStatus";
 import { hidePopup, useFitWindow } from "./api/window";
 import { useUpdater } from "./lib/useUpdater";
@@ -38,6 +40,7 @@ export default function App() {
 
   return (
     <div ref={ref} className="popup" style={fixedHeight}>
+      {inBrowser && <PasswordPrompt />}
       {!status ? (
         <div className="empty">Loading…</div>
       ) : view === "settings" ? (

@@ -21,22 +21,50 @@ const requests: Record<string, (args: Args) => Args> = {
   allow_simultaneous_connections: () => ({ cmd: "allowSimultaneousConnections" }),
 };
 
-/** One command; rejects with the message string the Rust side returned, as `invoke` does. */
-export async function call<T>(command: string, args: Args = {}): Promise<T> {
-  if (!inBrowser) return invoke<T>(command, args);
-  const request = requests[command];
-  if (!request) throw `${command} isn't available in the WebUI`;
-  const response = await fetch("/api", {
+/** `control::NEEDS_ADMIN`: the WebUI wants the password typed again before a DNS change. */
+const NEEDS_ADMIN = "This change needs administrator approval.";
+
+/** Asks for the WebUI password; `null` when cancelled. Set by `PasswordPrompt`. */
+let askPassword: (() => Promise<string | null>) | null = null;
+
+export function onPasswordNeeded(ask: typeof askPassword) {
+  askPassword = ask;
+}
+
+async function post(path: string, body: unknown): Promise<Response> {
+  const response = await fetch(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(request(args)),
+    body: JSON.stringify(body),
   });
   if (response.status === 401) {
     window.location.assign("/login");
     throw "Signed out";
   }
+  return response;
+}
+
+async function send<T>(body: Args): Promise<T> {
+  const response = await post("/api", body);
   if (!response.ok) throw await response.text();
   const reply = (await response.json()) as { Ok: T } | { Err: string };
   if ("Err" in reply) throw reply.Err;
   return reply.Ok;
+}
+
+/** One command; rejects with the message string the Rust side returned, as `invoke` does. */
+export async function call<T>(command: string, args: Args = {}): Promise<T> {
+  if (!inBrowser) return invoke<T>(command, args);
+  const request = requests[command];
+  if (!request) throw `${command} isn't available in the WebUI`;
+  try {
+    return await send<T>(request(args));
+  } catch (err) {
+    if (err !== NEEDS_ADMIN || !askPassword) throw err;
+  }
+  const password = await askPassword();
+  if (password === null) throw "The change needs administrator approval, which wasn't given.";
+  const approval = await post("/approve", { password });
+  if (!approval.ok) throw await approval.text();
+  return send<T>(request(args));
 }

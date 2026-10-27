@@ -28,7 +28,7 @@ fn run_mode() -> Option<i32> {
     }
     #[cfg(target_os = "linux")]
     if has_arg(app::service::CLEAN_UP_ARG) {
-        // To the journal: the service's own log file is the service's.
+        // To the journal, as the service logs.
         log::set_logger(&headless::StderrLog).ok();
         log::set_max_level(log::LevelFilter::Info);
         engine::clean_up_stale();

@@ -301,6 +301,29 @@ impl AppState {
         }
     }
 
+    /// Puts the saved DNS settings in force in the running engine. A start
+    /// under way holds the lock, so this waits and then applies them. If they
+    /// can't be (the guard failed), NetAgg turns off rather than run without
+    /// the block the user asked for.
+    pub async fn apply_dns(&self) -> Result<(), String> {
+        let mut engine = self.engine.lock().await;
+        let Some(running) = engine.as_mut() else {
+            return Ok(());
+        };
+        let applied = self
+            .engine_config(&self.settings())
+            .and_then(|config| running.set_dns(config));
+        drop(engine);
+        if let Err(err) = applied {
+            log::error!("could not apply the DNS settings: {err}");
+            self.turn_off(false).await;
+            let message = format!("Couldn't apply the DNS settings: {err}");
+            *self.error.lock().unwrap() = Some(message.clone());
+            return Err(message);
+        }
+        Ok(())
+    }
+
     fn engine_config(&self, settings: &Settings) -> std::io::Result<EngineConfig> {
         let manual = settings.dns_mode == DnsMode::Manual;
         let upstreams = if manual {
@@ -335,19 +358,6 @@ impl AppState {
             self.update_settings(|s| s.on = false);
         }
         *self.flow_counts.lock().unwrap() = FlowCounts::default();
-    }
-
-    /// Applies settings the engine only reads at start (DNS).
-    /// Goes by "on" as saved, not the running engine: a change that arrives
-    /// while an earlier one's start is still under way must restart it too,
-    /// or the engine keeps the earlier settings. `turn_off` waits for that
-    /// start to finish.
-    pub async fn restart(&self) -> Result<(), String> {
-        if !self.settings().on {
-            return Ok(());
-        }
-        self.turn_off(false).await;
-        self.turn_on().await
     }
 
     /// Cleans up after the packet stack stopped by itself, which would

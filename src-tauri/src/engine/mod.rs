@@ -87,6 +87,10 @@ pub struct EngineConfig {
 
 pub struct Engine {
     pub flows: Arc<Flows>,
+    intercept: Arc<dns::Intercept>,
+    /// The adapter's, for the DNS guard.
+    #[cfg(not(target_os = "macos"))]
+    if_index: u32,
     #[cfg(not(target_os = "macos"))]
     routes: Vec<Route>,
     /// The routes and DNS, held by the privileged helper or by this process.
@@ -138,15 +142,12 @@ impl Engine {
         let stack = IpStack::new(stack_config(), gate::Gate::new(device, router.clone()));
         let flows = Arc::new(Flows::default());
         let (stop, stopped) = watch::channel(false);
-        let intercept = Arc::new(dns::Intercept {
-            resolver: config.resolver,
-            enforce: config.enforce_dns,
-        });
+        let intercept = Arc::new(dns::Intercept::new(config.resolver, config.enforce_dns));
         let tasks = vec![
             tokio::spawn(accept(
                 stack,
                 router.clone(),
-                intercept,
+                intercept.clone(),
                 flows.clone(),
                 stopped.clone(),
             )),
@@ -155,6 +156,9 @@ impl Engine {
         log::info!("engine started");
         Ok(Engine {
             flows,
+            intercept,
+            #[cfg(not(target_os = "macos"))]
+            if_index: _if_index,
             #[cfg(not(target_os = "macos"))]
             routes,
             #[cfg(target_os = "macos")]
@@ -168,6 +172,29 @@ impl Engine {
             stop,
             tasks,
         })
+    }
+
+    /// Puts new DNS settings in force without dropping any connection. The
+    /// guard comes before the user's servers and goes after them, so no
+    /// lookup slips around them in between.
+    pub fn set_dns(&mut self, config: EngineConfig) -> io::Result<()> {
+        #[cfg(not(target_os = "macos"))]
+        if config.enforce_dns && self.dns_guard.is_none() {
+            self.dns_guard = Some(DnsGuard::apply(self.if_index)?);
+        }
+        let enforcing = config.enforce_dns;
+        self.intercept.set(config.resolver, enforcing);
+        #[cfg(not(target_os = "macos"))]
+        if !enforcing {
+            self.dns_guard = None;
+        }
+        if enforcing {
+            // Lookups already going to other servers through the adapter
+            // would carry on; closed, they're asked again and answered here.
+            self.flows.abort_to_port(crate::net::dns::DNS_PORT);
+        }
+        log::info!("DNS settings applied");
+        Ok(())
     }
 
     /// False once the packet stack has stopped by itself.
@@ -392,14 +419,14 @@ async fn accept(
 fn dispatch(
     stream: IpStackStream,
     router: &Arc<Router>,
-    intercept: &dns::Intercept,
+    intercept: &Arc<dns::Intercept>,
     flows: &Arc<Flows>,
 ) {
     match stream {
         IpStackStream::Tcp(tcp) => {
             let flow = flows.open(Proto::Tcp, tcp.local_addr(), tcp.peer_addr());
             if intercept.takes(flow.dst) {
-                spawn_flow(flows, flow, dns::tcp(tcp, intercept.resolver.clone()));
+                spawn_flow(flows, flow, dns::tcp(tcp, intercept.clone()));
             } else {
                 spawn_flow(flows, flow.clone(), tcp::handle(tcp, router.clone(), flow));
             }
@@ -407,7 +434,7 @@ fn dispatch(
         IpStackStream::Udp(udp) => {
             let flow = flows.open(Proto::Udp, udp.local_addr(), udp.peer_addr());
             if intercept.takes(flow.dst) {
-                spawn_flow(flows, flow, dns::udp(udp, intercept.resolver.clone()));
+                spawn_flow(flows, flow, dns::udp(udp, intercept.clone()));
             } else {
                 spawn_flow(flows, flow.clone(), udp::handle(udp, router.clone(), flow));
             }
