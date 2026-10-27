@@ -24,7 +24,7 @@ pub use elevation::{can_elevate, elevates_in_place, is_elevated};
 pub use icmp::{icmp_echo, icmp_hop};
 pub use instance::Instance;
 pub use routes::{add_unicast_address, Route};
-pub use rp_filter::LooseRpFilter;
+pub use rp_filter::{arp_flux_prone, LooseRpFilter};
 #[cfg(feature = "server")]
 pub use service::WEBUI_USER;
 pub use service::{

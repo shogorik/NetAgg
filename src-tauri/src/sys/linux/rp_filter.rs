@@ -38,6 +38,23 @@ impl LooseRpFilter {
     }
 }
 
+/// Whether `interface` answers ARP for addresses that aren't its own, or
+/// names the wrong one in its requests (the kernel's defaults). With two
+/// adapters on one subnet the router can then send one adapter's replies
+/// to the other, where a socket pinned to the first never sees them.
+pub fn arp_flux_prone(interface: &str) -> bool {
+    // The kernel uses the higher of `all` and the interface's own value.
+    let value = |name: &str| {
+        ["all", interface]
+            .iter()
+            .filter_map(|conf| fs::read_to_string(format!("{CONF}/{conf}/{name}")).ok())
+            .filter_map(|v| v.trim().parse::<u8>().ok())
+            .max()
+            .unwrap_or(0)
+    };
+    value("arp_ignore") < 1 || value("arp_announce") < 2
+}
+
 impl Drop for LooseRpFilter {
     fn drop(&mut self) {
         for path in &self.loosened {

@@ -125,12 +125,14 @@ impl Flows {
         self.map.lock().unwrap().len()
     }
 
-    /// Closes every flow on `link_id`. Returns how many were closed.
-    pub fn abort_on_link(&self, link_id: &str) -> usize {
+    /// Closes the flows on `link_id` that have moved nothing for at least
+    /// `idle` (zero: all of them). Returns how many were closed.
+    pub fn abort_on_link(&self, link_id: &str, idle: Duration) -> usize {
         let flows: Vec<Arc<Flow>> = self
             .snapshot()
             .into_iter()
             .filter(|f| f.link.get().map(String::as_str) == Some(link_id))
+            .filter(|f| f.idle_for() >= idle)
             .collect();
         flows.iter().filter(|f| f.lose()).count()
     }
@@ -231,9 +233,11 @@ mod tests {
             flows.set_abort(flow.id, task.abort_handle());
             tasks.push(task);
         }
-        assert_eq!(flows.abort_on_link("wifi"), 2);
+        // Nothing has stalled for an hour, so a failing link keeps them.
+        assert_eq!(flows.abort_on_link("wifi", Duration::from_secs(3600)), 0);
+        assert_eq!(flows.abort_on_link("wifi", Duration::ZERO), 2);
         // Still closing: not counted again.
-        assert_eq!(flows.abort_on_link("wifi"), 0);
+        assert_eq!(flows.abort_on_link("wifi", Duration::ZERO), 0);
         for task in tasks {
             let _ = tokio::time::timeout(std::time::Duration::from_millis(50), task).await;
         }

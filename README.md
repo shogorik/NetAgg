@@ -130,6 +130,8 @@ proportionally more.
 - **Switching a network off** closes its connections. Apps reconnect through the other networks.
 - **Switching it back on** only gets *new* connections. Downloads already running stay where they are until they finish
   or reconnect.
+- **A network that stops reaching the internet** (NetAgg checks every 5 seconds) gets no new connections. Its
+  connections that stall for 10 seconds are closed, so their apps reconnect elsewhere; ones still moving data stay.
 - **IPv6** is only used on networks where it actually works. Otherwise apps are told to use IPv4 straight away.
 - **DNS** is answered by NetAgg itself (the adapter's DNS server is 10.77.0.53). By default (**Auto**) each lookup goes
   to the DNS servers of a network (what its router handed out), through that same network. In Settings → DNS you can
@@ -176,6 +178,16 @@ and newer:
   `sudo apt update && sudo apt upgrade`, also install the small `netagg-apt` package, which adds NetAgg's signed apt
   repository (it's optional, and removing it stops that). The WebUI
   tells you when one is out, but never installs anything itself.
+
+**Two adapters on the same router** (say Ethernet and Wi-Fi, both 192.168.1.x): with Linux's default ARP settings the
+router can send one adapter's replies to the other, and NetAgg then sees a network dropping out every few minutes.
+NetAgg warns about it and shows the fix, which makes each adapter answer only for its own address:
+
+```bash
+printf 'net.ipv4.conf.all.arp_ignore = 1\nnet.ipv4.conf.all.arp_announce = 2\n' | sudo tee /etc/sysctl.d/60-netagg-arp.conf && sudo sysctl --system
+```
+
+Then reconnect both networks. Windows doesn't need this.
 
 Both are built and pass their lab tests; they'll be released once they've been tested on real networks.
 

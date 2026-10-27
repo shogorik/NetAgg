@@ -42,6 +42,10 @@ pub struct Status {
     /// phone) is up, because of its "minimize simultaneous connections"
     /// policy.
     pub drops_wifi: bool,
+    /// Networks sharing a router with another one while Linux's default ARP
+    /// settings let replies land on the wrong adapter (see
+    /// `sys::arp_flux_prone`); empty when that can't happen.
+    pub arp_flux: Vec<String>,
 }
 
 /// A link's path, stage by stage, in ms (`None`: no answer).
@@ -240,6 +244,10 @@ pub fn build(state: &AppState) -> Status {
     links.sort_by_key(|l| (!l.is_default, !l.present));
 
     let drops_wifi = drops_wifi(&links);
+    #[cfg(target_os = "linux")]
+    let arp_flux = arp_flux(&links, sys::arp_flux_prone);
+    #[cfg(not(target_os = "linux"))]
+    let arp_flux = Vec::new();
     let flows = state.flows.read().unwrap().clone();
     Status {
         platform: std::env::consts::OS,
@@ -255,9 +263,30 @@ pub fn build(state: &AppState) -> Status {
         connections: flows.map_or(0, |f| f.len()),
         today_bytes: state.usage.lock().unwrap().today(sys::local_date()),
         drops_wifi,
+        arp_flux,
         links,
         settings: settings_status(&settings),
     }
+}
+
+/// The present networks whose IPv4 router another present network also
+/// uses, where `prone` says the adapter's ARP settings allow flux.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn arp_flux(links: &[LinkStatus], prone: impl Fn(&str) -> bool) -> Vec<String> {
+    let router = |l: &LinkStatus| {
+        l.present
+            .then(|| l.gateway.as_deref()?.parse::<std::net::Ipv4Addr>().ok())
+            .flatten()
+    };
+    links
+        .iter()
+        .filter(|l| {
+            router(l).is_some_and(|gw| {
+                links.iter().filter(|o| router(o) == Some(gw)).count() > 1
+            }) && prone(&l.os_name)
+        })
+        .map(|l| l.name.clone())
+        .collect()
 }
 
 fn settings_status(settings: &Settings) -> SettingsStatus {
@@ -296,6 +325,7 @@ pub fn offline(error: String) -> Status {
         links: Vec::new(),
         settings: settings_status(&Settings::default()),
         drops_wifi: false,
+        arp_flux: Vec::new(),
     }
 }
 
@@ -421,5 +451,50 @@ mod tests {
         assert_eq!(percents(&[5, 0]), vec![100, 0]);
         assert_eq!(percents(&[0, 0]), vec![0, 0]);
         assert_eq!(percents(&[]), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn arp_flux_needs_two_networks_on_one_router() {
+        let link = |name: &str, gateway: &str, present: bool| LinkStatus {
+            id: name.into(),
+            name: name.to_uppercase(),
+            description: String::new(),
+            kind: "other",
+            address: None,
+            gateway: Some(gateway.into()),
+            speed_bps: None,
+            latency_ms: None,
+            health: "up",
+            present,
+            is_default: false,
+            os_name: name.into(),
+            total_bytes: 0,
+            shares_line_with: None,
+            diagnosis: DiagnosisStatus {
+                router: None,
+                isp: None,
+                isp_address: None,
+                cloudflare: None,
+                adguard: None,
+                checked: false,
+            },
+            enabled: true,
+            weight: 5,
+            rx_rate: 0,
+            tx_rate: 0,
+            share: 0,
+            connections: 0,
+        };
+        let links = [
+            link("eth", "198.51.100.1", true),
+            link("wifi", "198.51.100.1", true),
+            link("usb0", "10.0.0.2", true),
+            link("old", "198.51.100.1", false),
+            link("v6", "fe80::1", true),
+        ];
+        assert_eq!(arp_flux(&links, |_| true), ["ETH", "WIFI"]);
+        assert_eq!(arp_flux(&links, |name| name == "wifi"), ["WIFI"]);
+        assert!(arp_flux(&links, |_| false).is_empty());
+        assert!(arp_flux(&links[1..], |_| true).is_empty());
     }
 }

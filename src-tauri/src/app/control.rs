@@ -116,7 +116,7 @@ pub async fn handle(state: &AppState, request: Request, caller: Caller) -> Resul
                 // Switching a network off moves its traffic too: apps
                 // reconnect, and their new connections go elsewhere.
                 if let Some(flows) = state.flows.read().unwrap().as_ref() {
-                    flows.abort_on_link(&id);
+                    flows.abort_on_link(&id, std::time::Duration::ZERO);
                 }
             }
         }

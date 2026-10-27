@@ -11,6 +11,10 @@ import { networkColors } from "../lib/format";
 import { elevationNote, footerInfo, headerStatus, inUse, type Pending } from "../lib/summary";
 import type { UpdateState } from "../lib/update";
 
+/** Makes each adapter answer ARP only for its own address, and name it in its own requests. */
+const ARP_FIX =
+  "printf 'net.ipv4.conf.all.arp_ignore = 1\\nnet.ipv4.conf.all.arp_announce = 2\\n' | sudo tee /etc/sysctl.d/60-netagg-arp.conf && sudo sysctl --system";
+
 interface Props {
   status: Status;
   onStatus: (status: Status) => void;
@@ -82,6 +86,17 @@ export function Main({ status, onStatus, onSettings, onConnections, update }: Pr
           connection.{" "}
           <button type="button" className="link-button" onClick={allowBoth}>
             Keep both connected
+          </button>
+        </div>
+      )}
+      {status.arpFlux.length > 0 && (
+        <div className="notice" role="alert">
+          {status.arpFlux.join(" and ")} are on the same router, and with Linux&apos;s default ARP settings
+          replies for one can arrive on the other, so NetAgg sees a network dropping out. To fix it, run this
+          once, then reconnect both networks:
+          <code className="notice-command">{ARP_FIX}</code>
+          <button type="button" className="link-button" onClick={() => void navigator.clipboard?.writeText(ARP_FIX)}>
+            Copy
           </button>
         </div>
       )}

@@ -440,6 +440,10 @@ fn spawn_flow(
 /// move it.
 const IDLE_BEFORE_MOVE: Duration = Duration::from_secs(30);
 
+/// How long a flow on a connected link that fails its probes may carry
+/// nothing before it's closed, so its app reconnects elsewhere.
+const STALLED: Duration = Duration::from_secs(10);
+
 /// Follows the networks coming and going. New flows already avoid a network
 /// that's gone or failing its probes; this closes the flows still on it, so
 /// apps reconnect instead of hanging. When a network comes back (or is
@@ -478,7 +482,15 @@ async fn follow_links(
         before = now;
         for link in links.all() {
             if !link.usable() {
-                let closed = flows.abort_on_link(&link.id);
+                // A link still connected but failing its probes may only be
+                // missing the probes' replies (two adapters on one subnet):
+                // flows still moving data stay, stalled ones go.
+                let idle = if link.info().present {
+                    STALLED
+                } else {
+                    Duration::ZERO
+                };
+                let closed = flows.abort_on_link(&link.id, idle);
                 if closed > 0 {
                     log::info!(
                         "{}: closed {closed} flows after the network was lost",

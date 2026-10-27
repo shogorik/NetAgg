@@ -100,6 +100,18 @@ button.chip:hover {
   line-height: 16px;
 }
 
+.notice-command {
+  display: block;
+  margin: 6px 0 4px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.2);
+  color: var(--text);
+  font-size: 11px;
+  word-break: break-all;
+  user-select: text;
+}
+
 /* A newer version, found by the check at start */
 .update-banner {
   margin: 0 16px 12px;

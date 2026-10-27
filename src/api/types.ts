@@ -84,6 +84,8 @@ export interface Status {
   settings: SettingsStatus;
   /** Windows drops Wi-Fi while a wired-looking network (a USB-tethered phone) is up. */
   dropsWifi: boolean;
+  /** Linux: networks on one router whose ARP settings let replies land on the other adapter. */
+  arpFlux: string[];
 }
 
 export interface Connection {
