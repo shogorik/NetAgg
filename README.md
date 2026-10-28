@@ -28,8 +28,7 @@ capture, the per-network relays and the whole popup are Uditya's work, used unde
 
 ## How NetAgg differs from MultiPath
 
-NetAgg started as a security review of MultiPath ([SECURITY-REVIEW.md](SECURITY-REVIEW.md)). MultiPath has no
-malicious behaviour; the changes close privacy gaps and add control:
+NetAgg started as a security review of MultiPath. MultiPath has no malicious behaviour; the changes close privacy gaps and add control:
 
 - **DNS is yours, not fixed.** MultiPath sends every lookup unencrypted to Google (8.8.8.8) or Cloudflare (1.1.1.1).
   NetAgg answers lookups itself: **Auto** uses each network's own DNS servers (what your router hands out), through
@@ -41,9 +40,13 @@ malicious behaviour; the changes close privacy gaps and add control:
 - **Phones are never the default by accident (Windows).** Windows tends to route everything through a USB-tethered
   phone (and its mobile data). NetAgg keeps Windows' default route off the phone while another network is up, or on
   the network you pick. Phones show as *Phone (USB tethering)*, and every network can be renamed.
-- **Privilege separation (Windows).** The engine runs in a small Windows service; the tray app and its web view run
-  without administrator rights. The service only answers NetAgg's own installed executable, keeps its settings where
-  only administrators can change them, and changing DNS settings needs administrator approval (UAC).
+- **Privilege separation.** The engine runs in a small background service; the tray app and its web view run
+  without administrator rights. On Windows the service only answers NetAgg's own installed executable and keeps its
+  settings where only administrators can change them; on Linux it's a systemd service with only the two network
+  capabilities it needs and settings only root can read. Changing DNS settings needs administrator approval (UAC on
+  Windows, polkit on Linux).
+- **A WebUI for Linux servers.** The popup in your browser, over HTTPS on your local network and Tailscale only,
+  with a password (stored only as an argon2id hash) that is asked again before DNS changes.
 - **Hardening:** single-instance objects sandboxed processes can't touch, a strict Content Security Policy, and
   updates signed with NetAgg's own key from this repository.
 
@@ -63,7 +66,7 @@ malicious behaviour; the changes close privacy gaps and add control:
 
 ## What it does
 
-- Spreads your PC's connections across all your networks, so they all work at once.
+- Spreads your PC's (or Linux server's) connections across all your networks, so they all work at once.
 - Two 10 Mbps networks give you about **20 Mbps** for anything that opens several connections.
 - Lives in the tray as a small popup: turn it on, switch networks on or off, see each network's speed.
 
@@ -236,13 +239,18 @@ The installer runs (administrator approval) and restarts the NetAgg service, whi
 git clone https://github.com/shogorik/NetAgg.git
 cd NetAgg
 npm install
-npm run tauri dev       # opens the app. Windows: run the service yourself first (see CLAUDE.md); Linux: accept the prompt
+npm run tauri dev       # opens the app; it needs the service running (below)
 ```
+
+The tray app talks to the NetAgg service. While developing, stop the installed one and run the debug build's in the
+foreground instead: on Windows `net stop NetAgg`, then `src-tauri\target\debug\netagg.exe --service` in an
+administrator terminal; on Linux `sudo systemctl stop netagg`, then `sudo src-tauri/target/debug/netagg --service`.
 
 **Build the packages:**
 
 ```sh
-npm run tauri build     # Windows: bundle/nsis/ · Linux: bundle/deb/ and bundle/appimage/
+npm run tauri build     # Windows: the installer in src-tauri/target/release/bundle/nsis/
+scripts/build-linux.sh  # Linux (Ubuntu 24.04): the net-agg, netagg-server and netagg-apt .debs
 ```
 
 **Release:** `scripts/release.sh "what's new"` builds this system's bundles, signs them for the updater with the key at

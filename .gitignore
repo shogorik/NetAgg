@@ -8,6 +8,14 @@ src-tauri/gen/schemas/
 *.key
 *.key.pub
 updater.key*
+# Development notes and machine-specific scripts live in a separate private repository
+# (its git folder is .git-dev; see CLAUDE.md there).
+.git-dev/
+CLAUDE.md
+TaskList.md
+SECURITY-REVIEW.md
+scripts/real-run.sh
+scripts/lab-service.sh
 # Built release assets (scripts/release.sh).
 release-assets/
 apt-repo/

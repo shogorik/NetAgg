@@ -22,6 +22,11 @@ ROOT="$(mktemp -d)"
 APT_ROOT="$(mktemp -d)"
 trap 'rm -rf "$ROOT" "$APT_ROOT"' EXIT
 
+# Panic messages carry source paths: keep the build machine's home folder out of the binary.
+case "${RUSTFLAGS:-}" in
+  *remap-path-prefix*) ;;
+  *) export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=$HOME=/build" ;;
+esac
 npm run build
 (cd src-tauri && cargo build --release --no-default-features --features server --bin netagg-server)
 
