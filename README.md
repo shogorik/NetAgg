@@ -4,8 +4,8 @@
 
 # NetAgg
 
-**Net Aggregator: use Wi-Fi, Ethernet and a USB-tethered phone at the same time, for the whole PC, with DNS that stays
-yours.**
+**Network Aggregator (or NetAgg, for short): use Wi-Fi, Ethernet and a USB-tethered phone at the same time, for the
+whole PC, with DNS that stays yours.**
 
 A small tray app for **Windows** and **Linux**, built with **Tauri v2 and Rust**. Everything runs on your computer: no server, no
 relay, no account.
