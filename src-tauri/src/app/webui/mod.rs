@@ -1,5 +1,6 @@
-//! netagg-server's WebUI (`netagg-server --webui`, `netagg-webui.service`):
-//! the popup in a browser, over HTTPS, for headless Linux servers. It runs
+//! The WebUI (`--webui`, `netagg-webui.service`): the popup in a browser,
+//! over HTTPS. netagg-server runs it for headless Linux servers; the Linux
+//! desktop package carries it switched off (`switch`). It runs
 //! as its own user, without root or capabilities, and forwards each request
 //! of a signed-in browser to the NetAgg service over its control socket.
 //! The service counts this user as administrator, so the WebUI is the
@@ -10,6 +11,7 @@
 //! are answered; the internet never gets as far as the sign-in page.
 
 mod password;
+mod switch;
 mod tls;
 mod update;
 
@@ -18,6 +20,7 @@ use std::convert::Infallible;
 use std::io::{self, Read};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -35,12 +38,21 @@ use super::control::{Request, NEEDS_ADMIN};
 use super::{service, status};
 
 pub use password::{run as run_password, PASSWORD_ARG};
+pub use switch::{run as run_switch, SWITCH_ARG};
+#[cfg(feature = "gui")]
+pub use switch::{state as switch_state, Switch};
 
 pub const WEBUI_ARG: &str = "--webui";
 /// The built popup, for development: `--www <dist folder>`.
 const WWW_ARG: &str = "--www";
-const WWW_DIR: &str = "/usr/share/netagg-server/www";
+const WWW_DIR: &str = "/usr/share/netagg/www";
 const PORT: u16 = 8443;
+/// The command that carries this WebUI: the desktop package's or netagg-server.
+const CLI: &str = if cfg!(feature = "gui") {
+    "netagg"
+} else {
+    "netagg-server"
+};
 const COOKIE: &str = "netagg_session";
 /// A session ends after this long without a request.
 const IDLE: Duration = Duration::from_secs(12 * 60 * 60);
@@ -80,6 +92,8 @@ struct WebUi {
     sessions: Mutex<HashMap<String, Session>>,
     failures: Mutex<HashMap<IpAddr, (u32, Instant)>>,
     update: Arc<update::UpdateCheck>,
+    /// Logged once: requests come through a proxy.
+    proxy_seen: AtomicBool,
 }
 
 /// Runs until stopped; returns the exit code.
@@ -116,6 +130,7 @@ async fn serve(www: &Path, state_dir: &Path) -> io::Result<()> {
         sessions: Mutex::default(),
         failures: Mutex::default(),
         update: Arc::default(),
+        proxy_seen: AtomicBool::new(false),
     });
     // One socket for both families.
     let listener = TcpListener::bind((Ipv6Addr::UNSPECIFIED, PORT)).await?;
@@ -161,6 +176,13 @@ async fn serve(www: &Path, state_dir: &Path) -> io::Result<()> {
 impl WebUi {
     async fn handle(&self, req: HttpRequest<Incoming>, client: IpAddr) -> Response<Body> {
         let path = req.uri().path().to_owned();
+        let proxied = via_proxy(req.headers());
+        if proxied && !self.proxy_seen.swap(true, Ordering::Relaxed) {
+            log::warn!(
+                "requests arrive through a proxy or tunnel (from {client}): it decides who reaches the \
+                 WebUI now, and only the password protects it"
+            );
+        }
         let mut response = match (req.method(), path.as_str()) {
             (&Method::GET, "/login") => login_page(None),
             (&Method::POST, "/login") => match same_origin(&req) {
@@ -212,6 +234,10 @@ impl WebUi {
         // Not "no-referrer": with it, browsers send `Origin: null` on every POST,
         // the page's own included, and `same_origin` refuses them all.
         headers.insert("referrer-policy", HeaderValue::from_static(REFERRER_POLICY));
+        // The page warns about it (src/api/transport.ts).
+        if proxied {
+            headers.insert("x-netagg-proxied", HeaderValue::from_static("1"));
+        }
         headers
             .entry(header::CACHE_CONTROL)
             .or_insert(HeaderValue::from_static("no-store"));
@@ -441,6 +467,20 @@ fn same_origin(req: &HttpRequest<Incoming>) -> bool {
     }
 }
 
+/// Whether a reverse proxy or tunnel passed the request on. Then the client
+/// address `allowed_client` checked is the proxy's (often this machine), not
+/// the visitor's, and only the password stands between them and the WebUI.
+fn via_proxy(headers: &header::HeaderMap) -> bool {
+    PROXY_HEADERS.iter().any(|name| headers.contains_key(*name))
+}
+
+const PROXY_HEADERS: [&str; 4] = [
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-real-ip",
+];
+
 fn session_cookie(req: &HttpRequest<Incoming>) -> Option<String> {
     req.headers()
         .get_all(header::COOKIE)
@@ -510,17 +550,22 @@ fn login_page(error: Option<&str>) -> Response<Body> {
     let set = password::stored().is_some();
     let body = match (set, error) {
         (false, _) => format!(
-            "<p>No WebUI password has been set yet. On the server, run:</p>\
-             <pre>sudo netagg-server {PASSWORD_ARG}</pre>"
+            "<p>No WebUI password has been set yet. On that computer, run:</p>\
+             <pre>sudo {CLI} {PASSWORD_ARG}</pre>"
         ),
         (true, error) => format!(
             "{}<form method=\"post\" action=\"/login\">\
              <label for=\"p\">Password</label>\
              <input id=\"p\" name=\"password\" type=\"password\" autocomplete=\"current-password\" autofocus required>\
              <button type=\"submit\">Sign in</button></form>\
-             <p class=\"hint\">Forgot it? On the server, set a new one: \
-             <code>sudo netagg-server {PASSWORD_ARG}</code></p>",
-            error.map_or(String::new(), |e| format!("<p class=\"error\">{e}</p>"))
+             <p class=\"hint\">Forgot it? On that computer, set a new one: \
+             <code>sudo {CLI} {PASSWORD_ARG}</code>{also}</p>",
+            error.map_or(String::new(), |e| format!("<p class=\"error\">{e}</p>")),
+            also = if cfg!(feature = "gui") {
+                ", or in the NetAgg app's Settings"
+            } else {
+                ""
+            },
         ),
     };
     let page = format!("{LOGIN_HEAD}{body}</main></body></html>");
@@ -659,6 +704,7 @@ mod tests {
             sessions: Mutex::default(),
             failures: Mutex::default(),
             update: Arc::default(),
+            proxy_seen: AtomicBool::new(false),
         };
         let guesser = ip("198.51.100.99");
         let tries: Vec<_> = (0..6).map(|_| webui.attempt(guesser)).collect();
@@ -671,6 +717,18 @@ mod tests {
     fn ipv4_through_the_dual_stack_socket_is_ipv4() {
         assert_eq!(canonical(ip("::ffff:198.51.100.40")), ip("198.51.100.40"));
         assert_eq!(canonical(ip("fe80::1")), ip("fe80::1"));
+    }
+
+    #[test]
+    fn notices_a_proxy_in_front() {
+        let mut headers = header::HeaderMap::new();
+        headers.insert(header::HOST, HeaderValue::from_static("nas.lan:8443"));
+        assert!(!via_proxy(&headers));
+        for name in PROXY_HEADERS {
+            let mut proxied = headers.clone();
+            proxied.insert(name, HeaderValue::from_static("203.0.113.9"));
+            assert!(via_proxy(&proxied), "{name}");
+        }
     }
 
     #[test]

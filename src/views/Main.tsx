@@ -6,6 +6,7 @@ import { hidePopup } from "../api/window";
 import { Footer } from "../components/Footer";
 import { Header } from "../components/Header";
 import { NetworkRow } from "../components/NetworkRow";
+import { ProxyNotice } from "../components/ProxyNotice";
 import { ShareRing } from "../components/ShareRing";
 import { networkColors } from "../lib/format";
 import { elevationNote, footerInfo, headerStatus, inUse, type Pending } from "../lib/summary";
@@ -18,13 +19,16 @@ const ARP_FIX =
 interface Props {
   status: Status;
   onStatus: (status: Status) => void;
-  onSettings: () => void;
+  /** Left out where Settings is already on screen (a wide browser window): no gear then. */
+  onSettings?: () => void;
   onConnections: () => void;
   update: UpdateState;
+  /** Off where the page shows the proxy warning below the card instead. */
+  proxyNotice?: boolean;
 }
 
 /** The popup's first page: live traffic when on, an explanation when off. */
-export function Main({ status, onStatus, onSettings, onConnections, update }: Props) {
+export function Main({ status, onStatus, onSettings, onConnections, update, proxyNotice = true }: Props) {
   const [pending, setPending] = useState<Pending>(null);
   const [error, setError] = useState<string | null>(null);
   const [signInNeeded, setSignInNeeded] = useState(false);
@@ -80,6 +84,7 @@ export function Main({ status, onStatus, onSettings, onConnections, update }: Pr
           {notice}
         </div>
       )}
+      {proxyNotice && <ProxyNotice />}
       {status.dropsWifi && (
         <div className="notice" role="alert">
           Windows drops Wi-Fi while the tethered phone is connected, because it treats the phone as a cable

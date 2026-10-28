@@ -65,6 +65,8 @@ pub fn run() {
             commands::allow_simultaneous_connections,
             commands::set_option,
             commands::list_connections,
+            commands::webui_state,
+            commands::set_webui,
         ])
         .setup(move |app| {
             // A menu bar app: no Dock icon, no app menu.
@@ -97,6 +99,8 @@ pub fn run() {
             app.manage(backend);
             tray::create(app.handle())?;
             ticker::spawn(app.handle().clone());
+            #[cfg(target_os = "linux")]
+            commands::restart_when_replaced(app.handle().clone());
             // NetAgg comes back the way it was left. Without the rights to turn
             // on, it relaunches with them (pkexec), as the toggle does; a copy
             // relaunched for them just now that still lacks them doesn't try
@@ -143,13 +147,16 @@ pub fn run() {
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 // Give the PC its own routing back before going; "on" is
-                // kept, so the next start turns on again.
+                // kept, so the next start turns on again. Not when restarting
+                // into an upgraded copy: that one carries on as things are.
                 let backend = app.state::<Backend>();
                 let quit = Request::SetEnabled {
                     on: false,
                     remember: false,
                 };
-                if let Err(err) = tauri::async_runtime::block_on(backend.call(quit)) {
+                if commands::RESTARTING.load(std::sync::atomic::Ordering::SeqCst) {
+                    log::info!("restarting: NetAgg stays as it is");
+                } else if let Err(err) = tauri::async_runtime::block_on(backend.call(quit)) {
                     log::warn!("couldn't turn off: {err}");
                 }
                 if let Some(state) = backend.local() {

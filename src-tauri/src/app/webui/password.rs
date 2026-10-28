@@ -44,7 +44,7 @@ pub fn stored() -> Option<String> {
 /// and stores its hash. Returns the exit code.
 pub fn run(args: &[String]) -> i32 {
     if unsafe { libc::geteuid() } != 0 {
-        eprintln!("Run it as root: sudo netagg-server {PASSWORD_ARG}");
+        eprintln!("Run it as root: sudo {} {PASSWORD_ARG}", super::CLI);
         return 1;
     }
     let password = if args.iter().any(|a| a == STDIN_ARG) {
@@ -52,12 +52,9 @@ pub fn run(args: &[String]) -> i32 {
     } else {
         read_twice()
     };
-    let result = password
-        .and_then(|password| check_length(&password).map(|()| password))
-        .and_then(|password| hash(&password))
-        .and_then(|hash| save(Path::new(PASSWORD_FILE), &hash));
-    match result {
+    match password.and_then(|password| set(&password)) {
         Ok(()) => {
+            super::switch::journal("WebUI password changed; open sessions have ended");
             println!("WebUI password set. Open sessions have ended; sign in again.");
             0
         }
@@ -66,6 +63,12 @@ pub fn run(args: &[String]) -> i32 {
             1
         }
     }
+}
+
+/// Stores a new password's hash, which ends every open session. Needs root.
+pub fn set(password: &str) -> io::Result<()> {
+    check_length(password)?;
+    save(Path::new(PASSWORD_FILE), &hash(password)?)
 }
 
 fn check_length(password: &str) -> io::Result<()> {

@@ -30,5 +30,5 @@ pub mod tray;
 #[path = "tray_linux.rs"]
 pub mod tray;
 pub mod usage;
-#[cfg(all(feature = "server", target_os = "linux"))]
+#[cfg(all(feature = "webui", target_os = "linux"))]
 pub mod webui;

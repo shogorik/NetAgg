@@ -6,7 +6,7 @@ Wants=netagg.service
 
 [Service]
 Type=exec
-ExecStart=/usr/bin/netagg-server --webui
+ExecStart=/usr/bin/netagg --webui
 Restart=on-failure
 RestartSec=5
 # Its own user, without root or capabilities: it serves the page and passes a

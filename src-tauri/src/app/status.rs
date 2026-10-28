@@ -305,7 +305,7 @@ fn settings_status(settings: &Settings) -> SettingsStatus {
 
 /// What the popup shows when the engine can't be asked (Windows: the
 /// service isn't running), with the reason as the error.
-#[cfg(any(feature = "gui", all(feature = "server", target_os = "linux")))]
+#[cfg(any(feature = "gui", all(feature = "webui", target_os = "linux")))]
 pub fn offline(error: String) -> Status {
     Status {
         platform: std::env::consts::OS,

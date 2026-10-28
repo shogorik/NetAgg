@@ -45,6 +45,20 @@ fn run_mode() -> Option<i32> {
         let args: Vec<String> = std::env::args().collect();
         return Some(engine::run_helper(&args));
     }
+    // The WebUI, in netagg-server and (switched off) in the Linux desktop app.
+    #[cfg(all(feature = "webui", target_os = "linux"))]
+    {
+        use app::webui;
+        let args: Vec<String> = std::env::args().collect();
+        if has_arg(webui::WEBUI_ARG) {
+            return Some(webui::run(&args));
+        }
+        match args.get(1).map(String::as_str) {
+            Some(webui::PASSWORD_ARG) => return Some(webui::run_password(&args)),
+            Some(webui::SWITCH_ARG) => return Some(webui::run_switch()),
+            _ => {}
+        }
+    }
     None
 }
 
@@ -52,17 +66,6 @@ fn run_mode() -> Option<i32> {
 /// the headless modes.
 #[cfg(feature = "server")]
 pub fn run_server() -> i32 {
-    #[cfg(target_os = "linux")]
-    {
-        use app::webui;
-        let args: Vec<String> = std::env::args().collect();
-        if args.iter().any(|a| a == webui::WEBUI_ARG) {
-            return webui::run(&args);
-        }
-        if args.get(1).is_some_and(|a| a == webui::PASSWORD_ARG) {
-            return webui::run_password(&args);
-        }
-    }
     run_mode().unwrap_or_else(|| {
         eprintln!(
             "usage: netagg-server --service | --webui | webui-password | {}",

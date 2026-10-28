@@ -14,6 +14,7 @@ import { hidePopup } from "../api/window";
 import { SubHeader } from "../components/Header";
 import { Toggle } from "../components/Toggle";
 import { UpdatePanel } from "../components/UpdatePanel";
+import { WebUiSettings } from "../components/WebUiSettings";
 import { diagnosisLine, networkColors } from "../lib/format";
 import { startAtLoginLabel } from "../lib/summary";
 import type { UpdateControls } from "../lib/useUpdater";
@@ -21,14 +22,16 @@ import type { UpdateControls } from "../lib/useUpdater";
 interface Props {
   status: Status;
   onStatus: (status: Status) => void;
-  /** Left out where Settings has its own column (a wide browser window). */
+  /** Left out where Settings has its own columns (a wide browser window). */
   onBack?: () => void;
   update: UpdateControls;
+  /** Two columns side by side: networks on the left, the app, DNS and updates on the right. */
+  columns?: boolean;
 }
 
 const WEIGHT_DELAY_MS = 250;
 
-export function Settings({ status, onStatus, onBack, update }: Props) {
+export function Settings({ status, onStatus, onBack, update, columns = false }: Props) {
   const [error, setError] = useState<string | null>(null);
   const settings = status.settings;
   const present = status.links.filter((l) => l.present);
@@ -51,140 +54,145 @@ export function Settings({ status, onStatus, onBack, update }: Props) {
       )}
 
       <div className="divider" />
-      <div className="settings-body">
-        <Section title="Balancing">
-          <SwitchRow
-            label="Adaptive weighting"
-            desc="Faster networks get more new connections, based on what they actually deliver."
-            on={settings.adaptive}
-            onChange={(adaptive) => change({ adaptive })}
-          />
-          <SwitchRow
-            label="Keep sites on one network"
-            desc="Fixes sign-outs on banking sites, but one site no longer gets the combined speed."
-            on={settings.sticky}
-            onChange={(sticky) => change({ sticky })}
-          />
-          <SwitchRow
-            label="Include IPv6"
-            desc="Balance IPv6 traffic on networks that have it."
-            on={settings.captureIpv6}
-            onChange={(captureIpv6) => change({ captureIpv6 })}
-          />
-        </Section>
-
-        {status.links.length > 0 && (
-          <>
-            <div className="divider" />
-            <Section title="Networks">
-              {status.platform === "windows" && (
-                <DefaultRow
-                  links={status.links}
-                  chosen={settings.defaultLink}
-                  onChange={(id) =>
-                    setDefaultLink(id)
-                      .then(onStatus)
-                      .catch((e) => setError(errorText(e)))
-                  }
-                />
-              )}
-              {status.links.map((link) => (
-                <NameRow
-                  key={link.id}
-                  link={link}
-                  onSave={(label) => setLinkLabel(link.id, label).then(onStatus)}
-                />
-              ))}
-            </Section>
-          </>
-        )}
-
-        {present.length > 0 && (
-          <>
-            <div className="divider" />
-            <Section title="Share of new connections">
-              {present.map((link) => (
-                <WeightRow
-                  key={link.id}
-                  name={link.name}
-                  color={colors.get(link.id) ?? "var(--text-3)"}
-                  weight={link.weight}
-                  onCommit={(weight) =>
-                    setLinkWeight(link.id, weight)
-                      .then(onStatus)
-                      .catch((e) => setError(errorText(e)))
-                  }
-                />
-              ))}
-            </Section>
-          </>
-        )}
-
-        <div className="divider" />
-        <Section title="App">
-          {!inBrowser && (
+      <div className={columns ? "settings-body settings-columns" : "settings-body"}>
+        <div className="settings-col">
+          <Section title="Balancing">
             <SwitchRow
-              label={startAtLoginLabel(status)}
-              on={settings.startOnLogin}
-              onChange={(startOnLogin) => change({ startOnLogin })}
+              label="Adaptive weighting"
+              desc="Faster networks get more new connections, based on what they actually deliver."
+              on={settings.adaptive}
+              onChange={(adaptive) => change({ adaptive })}
             />
-          )}
-          <SwitchRow
-            label="Hide unavailable networks"
-            desc="Leaves unplugged cables and networks that aren't connected out of the list."
-            on={settings.hideUnavailable}
-            onChange={(hideUnavailable) => change({ hideUnavailable })}
-          />
-        </Section>
-
-        <div className="divider" />
-        <Section title="DNS">
-          <SwitchRow
-            label={`Use each network's own DNS (${settings.dnsMode === "auto" ? "Auto" : "Manual"})`}
-            desc="Lookups go to the servers each network hands out (usually its router), through that network."
-            on={settings.dnsMode === "auto"}
-            onChange={(auto) => change({ dnsMode: auto ? "auto" : "manual" })}
-          />
-          <DnsRow dns={settings.dns} onSave={(dns) => setOption({ dns }).then(onStatus)} />
-          {settings.dnsMode === "manual" && (
             <SwitchRow
-              label="Block other DNS"
-              desc="Every app's lookups go to your servers, even ones that name their own. Turn off only if an app breaks."
-              on={settings.enforceDns}
-              onChange={(enforceDns) => change({ enforceDns })}
+              label="Keep sites on one network"
+              desc="Fixes sign-outs on banking sites, but one site no longer gets the combined speed."
+              on={settings.sticky}
+              onChange={(sticky) => change({ sticky })}
             />
-          )}
-        </Section>
+            <SwitchRow
+              label="Include IPv6"
+              desc="Balance IPv6 traffic on networks that have it."
+              on={settings.captureIpv6}
+              onChange={(captureIpv6) => change({ captureIpv6 })}
+            />
+          </Section>
 
-        <div className="divider" />
-        <Section title="Updates">
-          <UpdatePanel status={status} update={update} />
-          <SwitchRow
-            label="Check for updates at start"
-            desc={
-              inBrowser
-                ? "The server asks GitHub for a newer version when this page opens. It never installs anything."
-                : "Asks GitHub for a newer version when NetAgg opens. Never installs without asking."
-            }
-            on={settings.checkUpdates}
-            onChange={(checkUpdates) => change({ checkUpdates })}
-          />
-        </Section>
-        {inBrowser && (
-          <>
-            <div className="divider" />
-            <Section title="WebUI">
-              <div className="setting-row">
-                <div className="setting-text">
-                  <span className="setting-label">Signed in</span>
+          {status.links.length > 0 && (
+            <>
+              <div className="divider" />
+              <Section title="Networks">
+                {status.platform === "windows" && (
+                  <DefaultRow
+                    links={status.links}
+                    chosen={settings.defaultLink}
+                    onChange={(id) =>
+                      setDefaultLink(id)
+                        .then(onStatus)
+                        .catch((e) => setError(errorText(e)))
+                    }
+                  />
+                )}
+                {status.links.map((link) => (
+                  <NameRow
+                    key={link.id}
+                    link={link}
+                    onSave={(label) => setLinkLabel(link.id, label).then(onStatus)}
+                  />
+                ))}
+              </Section>
+            </>
+          )}
+
+          {present.length > 0 && (
+            <>
+              <div className="divider" />
+              <Section title="Share of new connections">
+                {present.map((link) => (
+                  <WeightRow
+                    key={link.id}
+                    name={link.name}
+                    color={colors.get(link.id) ?? "var(--text-3)"}
+                    weight={link.weight}
+                    onCommit={(weight) =>
+                      setLinkWeight(link.id, weight)
+                        .then(onStatus)
+                        .catch((e) => setError(errorText(e)))
+                    }
+                  />
+                ))}
+              </Section>
+            </>
+          )}
+
+        </div>
+        <div className="settings-col">
+          <div className="divider" />
+          <Section title="App">
+            {!inBrowser && (
+              <SwitchRow
+                label={startAtLoginLabel(status)}
+                on={settings.startOnLogin}
+                onChange={(startOnLogin) => change({ startOnLogin })}
+              />
+            )}
+            <SwitchRow
+              label="Hide unavailable networks"
+              desc="Leaves unplugged cables and networks that aren't connected out of the list."
+              on={settings.hideUnavailable}
+              onChange={(hideUnavailable) => change({ hideUnavailable })}
+            />
+            {!inBrowser && status.platform === "linux" && <WebUiSettings status={status} />}
+          </Section>
+
+          <div className="divider" />
+          <Section title="DNS">
+            <SwitchRow
+              label={`Use each network's own DNS (${settings.dnsMode === "auto" ? "Auto" : "Manual"})`}
+              desc="Lookups go to the servers each network hands out (usually its router), through that network."
+              on={settings.dnsMode === "auto"}
+              onChange={(auto) => change({ dnsMode: auto ? "auto" : "manual" })}
+            />
+            <DnsRow dns={settings.dns} onSave={(dns) => setOption({ dns }).then(onStatus)} />
+            {settings.dnsMode === "manual" && (
+              <SwitchRow
+                label="Block other DNS"
+                desc="Every app's lookups go to your servers, even ones that name their own. Turn off only if an app breaks."
+                on={settings.enforceDns}
+                onChange={(enforceDns) => change({ enforceDns })}
+              />
+            )}
+          </Section>
+
+          <div className="divider" />
+          <Section title="Updates">
+            <UpdatePanel status={status} update={update} />
+            <SwitchRow
+              label="Check for updates at start"
+              desc={
+                inBrowser
+                  ? "The server asks GitHub for a newer version when this page opens. It never installs anything."
+                  : "Asks GitHub for a newer version when NetAgg opens. Never installs without asking."
+              }
+              on={settings.checkUpdates}
+              onChange={(checkUpdates) => change({ checkUpdates })}
+            />
+          </Section>
+          {inBrowser && (
+            <>
+              <div className="divider" />
+              <Section title="WebUI">
+                <div className="setting-row">
+                  <div className="setting-text">
+                    <span className="setting-label">Signed in</span>
+                  </div>
+                  <button type="button" className="secondary-button" onClick={signOut}>
+                    Sign out
+                  </button>
                 </div>
-                <button type="button" className="secondary-button" onClick={signOut}>
-                  Sign out
-                </button>
-              </div>
-            </Section>
-          </>
-        )}
+              </Section>
+            </>
+          )}
+        </div>
         <div className="bottom-spacer" />
       </div>
     </>

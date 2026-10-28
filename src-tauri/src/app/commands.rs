@@ -46,6 +46,49 @@ pub fn relaunch_info(args: &[String]) -> (bool, bool) {
 /// Passed along with `ELEVATED_ARG` when the user asked to turn on.
 pub const TURN_ON_ARG: &str = "--turn-on";
 
+/// Set when the tray app restarts into an upgraded copy of itself: the engine
+/// stays as it is instead of being turned off on the way out.
+pub static RESTARTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// A package upgrade (apt, or the in-app update's dpkg) replaces the program
+/// under the running tray app, which would go on running the old version;
+/// Linux then names it "<path> (deleted)". The app restarts itself into the
+/// new one, quietly (as at sign-in), and NetAgg stays on or off as it was.
+#[cfg(target_os = "linux")]
+pub fn restart_when_replaced(app: AppHandle) {
+    use std::time::Duration;
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            let Ok(exe) = std::env::current_exe() else {
+                continue;
+            };
+            let new = sys::without_deleted(exe.clone());
+            if new == exe || !new.is_file() {
+                continue;
+            }
+            // dpkg unpacks first and configures after: let it finish.
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            log::info!(
+                "{} was upgraded: restarting into the new version",
+                new.display()
+            );
+            // The new copy waits for this one's single-instance lock (`relaunch_info`).
+            let started = std::process::Command::new(&new)
+                .args([elevated_arg(), autostart::AUTOSTART_ARG.to_owned()])
+                .spawn();
+            match started {
+                Ok(_) => {
+                    RESTARTING.store(true, std::sync::atomic::Ordering::SeqCst);
+                    app.exit(0);
+                }
+                Err(err) => log::warn!("couldn't restart into the new version: {err}"),
+            }
+            return;
+        }
+    });
+}
+
 /// Asks the engine, and shows a new status at once. Where the app runs the
 /// engine itself without the rights to turn on (Linux), it restarts
 /// elevated, through the pkexec prompt, and this copy exits. On Windows the
@@ -120,6 +163,54 @@ pub async fn set_option(app: AppHandle, change: OptionChange) -> Result<Value, S
 #[tauri::command]
 pub async fn list_connections(app: AppHandle) -> Result<Value, String> {
     app.state::<Backend>().call(Request::Connections).await
+}
+
+/// The WebUI the Linux desktop package carries, switched off at first:
+/// whether it runs and has a password. `None` where there's no WebUI.
+#[tauri::command]
+pub async fn webui_state() -> Option<Value> {
+    #[cfg(all(feature = "webui", target_os = "linux"))]
+    return tauri::async_runtime::spawn_blocking(|| {
+        let (on, has_password) = super::webui::switch_state();
+        serde_json::json!({ "on": on, "hasPassword": has_password })
+    })
+    .await
+    .ok();
+    #[cfg(not(all(feature = "webui", target_os = "linux")))]
+    None
+}
+
+/// Turns the WebUI on (setting a new password first, if given) or off, as
+/// root through polkit; the password goes on pkexec's standard input.
+#[tauri::command]
+pub async fn set_webui(on: bool, password: Option<String>) -> Result<Option<Value>, String> {
+    #[cfg(all(feature = "webui", target_os = "linux"))]
+    return switch_webui(on, password).await;
+    #[cfg(not(all(feature = "webui", target_os = "linux")))]
+    {
+        let _ = (on, password);
+        Err("There's no WebUI on this system.".to_owned())
+    }
+}
+
+#[cfg(all(feature = "webui", target_os = "linux"))]
+async fn switch_webui(on: bool, password: Option<String>) -> Result<Option<Value>, String> {
+    let input =
+        serde_json::to_string(&super::webui::Switch { on, password }).map_err(|e| e.to_string())?;
+    let exe = sys::without_deleted(std::env::current_exe().map_err(|e| e.to_string())?);
+    let code = tauri::async_runtime::spawn_blocking(move || {
+        sys::run_elevated(&exe.to_string_lossy(), super::webui::SWITCH_ARG, &input)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|_| "The change needs administrator approval, which wasn't given.".to_owned())?;
+    if code != 0 {
+        return Err(format!(
+            "The WebUI couldn't be switched {} (code {code}).",
+            if on { "on" } else { "off" }
+        ));
+    }
+    Ok(webui_state().await)
 }
 
 #[cfg(test)]

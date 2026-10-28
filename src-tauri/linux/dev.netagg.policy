@@ -3,13 +3,14 @@
  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <!-- The tray app sends a DNS change (and other administrator-only requests)
      to the NetAgg service from a copy of itself started through pkexec:
-     Linux's equivalent of Windows' UAC prompt. -->
+     Linux's equivalent of Windows' UAC prompt. The same copy switches the
+     WebUI on or off (netagg webui-switch). -->
 <policyconfig>
   <vendor>NetAgg</vendor>
   <vendor_url>https://github.com/shogorik/NetAgg</vendor_url>
   <action id="dev.netagg.admin-request">
-    <description>Change NetAgg's DNS settings</description>
-    <message>NetAgg needs administrator approval to change where this computer's DNS lookups go.</message>
+    <description>Change NetAgg's DNS settings or WebUI</description>
+    <message>NetAgg needs administrator approval to change where this computer's DNS lookups go, or to switch its WebUI on or off or change its password.</message>
     <icon_name>network-workgroup</icon_name>
     <defaults>
       <allow_any>auth_admin</allow_any>

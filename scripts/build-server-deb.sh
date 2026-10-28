@@ -26,14 +26,15 @@ npm run build
 (cd src-tauri && cargo build --release --no-default-features --features server --bin netagg-server)
 
 install -Dm755 src-tauri/target/release/netagg-server "$ROOT/usr/bin/netagg-server"
-mkdir -p "$ROOT/usr/share/netagg-server/www"
-cp -r dist/. "$ROOT/usr/share/netagg-server/www/"
-# The same service as the desktop package, run from netagg-server.
+mkdir -p "$ROOT/usr/share/netagg/www"
+cp -r dist/. "$ROOT/usr/share/netagg/www/"
+# The same units as the desktop package, run from netagg-server.
 install -d "$ROOT/usr/lib/systemd/system"
-sed 's#/usr/bin/netagg #/usr/bin/netagg-server #g' src-tauri/linux/netagg.service \
-  > "$ROOT/usr/lib/systemd/system/netagg.service"
+for unit in netagg.service netagg-webui.service; do
+  sed 's#/usr/bin/netagg #/usr/bin/netagg-server #g' "src-tauri/linux/$unit" > "$ROOT/usr/lib/systemd/system/$unit"
+done
 grep -q '^ExecStart=/usr/bin/netagg-server --service$' "$ROOT/usr/lib/systemd/system/netagg.service"
-install -m644 src-tauri/linux/netagg-webui.service "$ROOT/usr/lib/systemd/system/"
+grep -q '^ExecStart=/usr/bin/netagg-server --webui$' "$ROOT/usr/lib/systemd/system/netagg-webui.service"
 install -Dm644 LICENSE "$ROOT/usr/share/doc/netagg-server/copyright"
 
 # Nothing but root may change what root runs, whatever the build user's umask.

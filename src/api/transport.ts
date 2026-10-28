@@ -31,12 +31,18 @@ export function onPasswordNeeded(ask: typeof askPassword) {
   askPassword = ask;
 }
 
+let proxied = false;
+
+/** Whether the WebUI said a reverse proxy or tunnel passed this page's requests on. */
+export const viaProxy = () => proxied;
+
 async function post(path: string, body: unknown): Promise<Response> {
   const response = await fetch(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (response.headers.get("x-netagg-proxied")) proxied = true;
   if (response.status === 401) {
     window.location.assign("/login");
     throw "Signed out";

@@ -25,7 +25,7 @@ pub use icmp::{icmp_echo, icmp_hop};
 pub use instance::Instance;
 pub use routes::{add_unicast_address, Route};
 pub use rp_filter::{arp_flux_prone, LooseRpFilter};
-#[cfg(feature = "server")]
+#[cfg(feature = "webui")]
 pub use service::WEBUI_USER;
 pub use service::{
     check_install_secure, control_listener, control_socket_trusted, pipe_client, prepare_data_dir,

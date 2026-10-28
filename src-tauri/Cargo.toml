@@ -25,7 +25,9 @@ required-features = ["server"]
 [features]
 default = ["gui"]
 gui = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-updater", "dep:tauri-plugin-process", "dep:ksni"]
-server = ["dep:argon2", "dep:rcgen", "hyper/server"]
+# The WebUI (Linux): netagg-server's, and the desktop app's, switched off until Settings turns it on.
+webui = ["dep:argon2", "dep:rcgen", "hyper/server"]
+server = ["webui"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [], optional = true }

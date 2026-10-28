@@ -46,7 +46,7 @@ export function UpdatePanel({ status, update }: Props) {
           <div className="setting-row stacked">
             <Text
               title={`NetAgg ${state.version} is available`}
-              desc={`You have ${current}. On the server, run “sudo apt update && sudo apt upgrade” if netagg-apt is installed, or install netagg-server_${state.version}_amd64.deb from ${RELEASES_PAGE}.`}
+              desc={`You have ${current}. On that computer, update from the NetAgg app if it has one, or run “sudo apt update && sudo apt upgrade” if netagg-apt is installed, or install netagg-server_${state.version}_amd64.deb from ${RELEASES_PAGE}.`}
             />
             <div className="update-actions">
               <button type="button" className="secondary-button" onClick={update.dismiss}>

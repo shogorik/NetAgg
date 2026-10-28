@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { inBrowser } from "./api/transport";
 import { updater } from "./api/updater";
 import { PasswordPrompt } from "./components/PasswordPrompt";
+import { ProxyNotice } from "./components/ProxyNotice";
 import { useStatus } from "./api/useStatus";
 import { hidePopup, useFitWindow } from "./api/window";
 import { useUpdater } from "./lib/useUpdater";
@@ -11,8 +12,8 @@ import { Settings } from "./views/Settings";
 
 type View = "main" | "settings" | "connections";
 
-/** In a browser at least this wide, the main page and Settings sit side by side. */
-const WIDE = "(min-width: 820px)";
+/** In a browser wide enough for three popup-wide columns: the main page, then Settings across two. */
+const WIDE = "(min-width: 1160px)";
 
 function useWide(): boolean {
   const [wide, setWide] = useState(() => inBrowser && window.matchMedia(WIDE).matches);
@@ -52,28 +53,39 @@ export default function App() {
     setHomeHeight(ref.current ? Math.ceil(ref.current.getBoundingClientRect().height) : null);
     setView("settings");
   };
-  const fixedHeight = view === "settings" && homeHeight ? { height: homeHeight } : undefined;
+  // In a browser, Settings fills the window instead, minus the page's margin above and below (#root's 24px).
+  const fixedHeight =
+    view !== "settings"
+      ? undefined
+      : inBrowser
+        ? { height: "calc(100dvh - 48px)" }
+        : homeHeight
+          ? { height: homeHeight }
+          : undefined;
 
-  // A wide browser window shows Settings beside the main page instead of in its place.
+  // A wide browser window shows Settings beside the main page, so there's no gear to open it.
   if (wide && status) {
     return (
       <div className="web-columns">
         <PasswordPrompt />
-        <div className="popup">
-          {view === "connections" ? (
-            <Connections status={status} onBack={back} />
-          ) : (
-            <Main
-              status={status}
-              onStatus={setStatus}
-              onSettings={() => {}}
-              onConnections={() => setView("connections")}
-              update={update.state}
-            />
-          )}
+        <div className="web-column">
+          <div className="popup">
+            {view === "connections" ? (
+              <Connections status={status} onBack={back} />
+            ) : (
+              <Main
+                status={status}
+                onStatus={setStatus}
+                onConnections={() => setView("connections")}
+                update={update.state}
+                proxyNotice={false}
+              />
+            )}
+          </div>
+          <ProxyNotice />
         </div>
-        <div className="popup">
-          <Settings status={status} onStatus={setStatus} update={update} />
+        <div className="popup web-settings">
+          <Settings status={status} onStatus={setStatus} update={update} columns />
         </div>
       </div>
     );

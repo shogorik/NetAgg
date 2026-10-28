@@ -29,6 +29,18 @@ export const setOption = (change: OptionChange) => call<Status>("set_option", { 
 
 export const listConnections = () => call<Connection[]>("list_connections");
 
+/** The WebUI the Linux desktop app carries; `null` where there's none (Windows, macOS, the browser). */
+export interface WebUiState {
+  on: boolean;
+  hasPassword: boolean;
+}
+
+export const webUiState = () => call<WebUiState | null>("webui_state");
+
+/** Asks for the administrator password (polkit); a new WebUI password is set before it starts. */
+export const setWebUi = (on: boolean, password: string | null = null) =>
+  call<WebUiState | null>("set_webui", { on, password });
+
 /** Commands reject with the message string the Rust side returned. */
 /** Rust errors start in lower case; the popup shows them as sentences. */
 export function errorText(err: unknown): string {

@@ -143,6 +143,21 @@ button.chip:hover {
   user-select: text;
 }
 
+.notice-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.notice-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
 /* A newer version, found by the check at start */
 .update-banner {
   margin: 0 16px 12px;
@@ -925,24 +940,49 @@ html.web .popup {
   width: 100%;
 }
 
-/* A wide browser window: the main page and Settings side by side */
-@media (min-width: 820px) {
+/* A wide browser window: three popup-wide columns, the main page, then Settings across two */
+@media (min-width: 1160px) {
   html.web #root:has(.web-columns) {
-    width: min(760px, calc(100vw - 32px));
+    width: min(1112px, calc(100vw - 32px));
     border-radius: 0;
     overflow: visible;
   }
 }
 
 .web-columns {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  align-items: start;
   gap: 16px;
 }
 
-.web-columns > .popup {
-  flex: 1;
+.web-column > .popup,
+.web-columns > .web-settings {
   min-width: 0;
   border-radius: 8px;
   overflow: hidden;
+}
+
+/* The proxy warning sits below the main page's card. */
+.web-column > .notice {
+  margin: 12px 0 0;
+}
+
+.settings-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+}
+
+.settings-columns > .settings-col + .settings-col {
+  border-left: 1px solid var(--border);
+}
+
+/* Each column starts at the top: no rule above the right one's first section. */
+.settings-columns > .settings-col + .settings-col > .divider:first-child {
+  display: none;
+}
+
+.settings-columns > .bottom-spacer {
+  grid-column: 1 / -1;
 }

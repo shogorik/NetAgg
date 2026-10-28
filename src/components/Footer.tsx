@@ -4,7 +4,8 @@ import { IconButton } from "./IconButton";
 interface Props {
   info: string;
   onConnections: () => void;
-  onSettings: () => void;
+  /** Left out where Settings is already on screen (a wide browser window). */
+  onSettings?: () => void;
 }
 
 export function Footer({ info, onConnections, onSettings }: Props) {
@@ -16,7 +17,7 @@ export function Footer({ info, onConnections, onSettings }: Props) {
       </span>
       <div className="footer-actions">
         <IconButton icon={List} label="Connections" onClick={onConnections} />
-        <IconButton icon={Settings} label="Settings" onClick={onSettings} />
+        {onSettings && <IconButton icon={Settings} label="Settings" onClick={onSettings} />}
       </div>
     </footer>
   );
