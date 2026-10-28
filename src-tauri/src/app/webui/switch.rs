@@ -3,7 +3,7 @@
 //! DNS) and writes what it wants on standard input, so a new password never
 //! shows on a command line.
 
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Read};
 use std::process::Command;
 
 use serde::{Deserialize, Serialize};
@@ -12,6 +12,9 @@ use super::password;
 
 pub const SWITCH_ARG: &str = "webui-switch";
 const UNIT: &str = "netagg-webui.service";
+/// Room for the longest password (1024 characters, up to 6 bytes each once
+/// in JSON); the app sends one short line.
+const MAX_REQUEST: u64 = 16 * 1024;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Switch {
@@ -31,6 +34,7 @@ pub fn run() -> i32 {
     let mut line = String::new();
     let Some(switch) = io::stdin()
         .lock()
+        .take(MAX_REQUEST)
         .read_line(&mut line)
         .ok()
         .and_then(|_| serde_json::from_str::<Switch>(&line).ok())
