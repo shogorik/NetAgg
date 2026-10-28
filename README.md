@@ -7,12 +7,12 @@
 **Net Aggregator: use Wi-Fi, Ethernet and a USB-tethered phone at the same time, for the whole PC, with DNS that stays
 yours.**
 
-A small tray app for **Windows**, built with **Tauri v2 and Rust**. Everything runs on your computer: no server, no
+A small tray app for **Windows** and **Linux**, built with **Tauri v2 and Rust**. Everything runs on your computer: no server, no
 relay, no account.
 
 | Windows 10 / 11 (64-bit) | Linux | macOS |
 |:---:|:---:|:---:|
-| ✅ **Available** | ⏳ **Coming soon** | ❌ Not planned for now |
+| ✅ **Available** | ✅ **Available** (Ubuntu 24.04+) | ❌ Not planned for now |
 
 <a href="https://github.com/shogorik/NetAgg/releases/latest"><img src="https://img.shields.io/badge/Download-Latest%20release-4CC2FF?style=for-the-badge&logoColor=white" alt="Download the latest release" /></a>
 
@@ -96,7 +96,7 @@ server on the internet.
 | Build tool | <img src="https://cdn.simpleicons.org/vite" width="16" height="16" alt="" /> Vite |
 | Icons | <img src="https://cdn.simpleicons.org/lucide/F56565" width="16" height="16" alt="" /> [Lucide](https://lucide.dev/) |
 | Tests | <img src="https://cdn.simpleicons.org/vitest" width="16" height="16" alt="" /> [Vitest](https://vitest.dev/), `cargo test` |
-| Packaging | <img src="https://cdn.simpleicons.org/nsis/8A8A8A" width="16" height="16" alt="" /> NSIS installer (through Tauri); `.deb` and AppImage for Linux once it's released |
+| Packaging | <img src="https://cdn.simpleicons.org/nsis/8A8A8A" width="16" height="16" alt="" /> NSIS installer (through Tauri); `.deb` packages for Linux (desktop and server), with an optional signed apt repository |
 
 ## How it works
 
@@ -165,19 +165,35 @@ Everything is on the [latest release](https://github.com/shogorik/NetAgg/release
 
 *Start with Windows* (in Settings) puts NetAgg in the tray when you sign in, with no permission prompt.
 
-### Linux: coming soon
+### Linux
 
-No Linux package has been released yet. Linux will get the same NetAgg as Windows, as two packages for Ubuntu 24.04
-and newer:
+Two packages for Ubuntu 24.04 and newer (64-bit). They can't be installed side by side.
 
-- **`net-agg` for Ubuntu Desktop:** the tray icon and popup, with the engine in a background service. Changing DNS
-  settings asks for your password, as Windows asks for administrator approval.
-- **`netagg-server` for headless servers:** the same service, plus a WebUI (the popup in your browser) at
-  `https://<server>:8443`. It answers only your local network and Tailscale. Set its password on the server with
-  `sudo netagg-server webui-password`; running it again sets a new one if you forget it. To get later versions with
-  `sudo apt update && sudo apt upgrade`, also install the small `netagg-apt` package, which adds NetAgg's signed apt
-  repository (it's optional, and removing it stops that). The WebUI
-  tells you when one is out, but never installs anything itself.
+- **`NetAgg_<version>_amd64.deb` (package `net-agg`) for Ubuntu Desktop:** the tray icon and popup, with the engine
+  in a background service. Changing DNS settings asks for your password, as Windows asks for administrator approval.
+
+  ```bash
+  sudo apt install ./NetAgg_<version>_amd64.deb
+  ```
+
+  It also carries the WebUI (the popup in your browser, for other computers on your network), switched off: turn it
+  on and set its password in Settings → App → **Open NetAgg in a browser**.
+- **`netagg-server_<version>_amd64.deb` for headless servers:** the same service, plus the WebUI at
+  `https://<server>:8443`. No GTK or WebKit needed.
+
+  ```bash
+  sudo apt install ./netagg-server_<version>_amd64.deb
+  sudo netagg-server webui-password
+  ```
+
+  Running `webui-password` again sets a new password if you forget it, and signs every session out.
+
+The WebUI answers only your local network and Tailscale, and uses a self-signed certificate (the browser warns once).
+Don't expose it to the internet; if it's reached through a reverse proxy or tunnel, it says so, since only the password
+protects it then. To get later versions with `sudo apt update && sudo apt upgrade`, also install the small
+`netagg-apt_<version>_all.deb`, which adds NetAgg's signed apt repository (optional; removing it stops that). The
+desktop app updates itself from Settings → **Updates**, as on Windows; the WebUI tells you when a new version is out,
+but never installs anything itself.
 
 **Two adapters on the same router** (say Ethernet and Wi-Fi, both 192.168.1.x): with Linux's default ARP settings the
 router can send one adapter's replies to the other, and NetAgg then sees a network dropping out every few minutes.
@@ -188,8 +204,6 @@ printf 'net.ipv4.conf.all.arp_ignore = 1\nnet.ipv4.conf.all.arp_announce = 2\n' 
 ```
 
 Then reconnect both networks. Windows doesn't need this.
-
-Both are built and pass their lab tests; they'll be released once they've been tested on real networks.
 
 ### macOS: not for now
 
