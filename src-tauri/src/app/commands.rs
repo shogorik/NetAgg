@@ -50,6 +50,17 @@ pub const TURN_ON_ARG: &str = "--turn-on";
 /// stays as it is instead of being turned off on the way out.
 pub static RESTARTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// Whether the tray app is on its way to a newer copy of itself: restarting on
+/// its own, or by the updater after it installed the new package (Linux; on
+/// Windows the updater exits without the app's exit event).
+pub fn restarting() -> bool {
+    #[cfg(target_os = "linux")]
+    if std::env::current_exe().is_ok_and(|exe| exe.to_string_lossy().ends_with(" (deleted)")) {
+        return true;
+    }
+    RESTARTING.load(std::sync::atomic::Ordering::SeqCst)
+}
+
 /// A package upgrade (apt, or the in-app update's dpkg) replaces the program
 /// under the running tray app, which would go on running the old version;
 /// Linux then names it "<path> (deleted)". The app restarts itself into the

@@ -154,7 +154,7 @@ pub fn run() {
                     on: false,
                     remember: false,
                 };
-                if commands::RESTARTING.load(std::sync::atomic::Ordering::SeqCst) {
+                if commands::restarting() {
                     log::info!("restarting: NetAgg stays as it is");
                 } else if let Err(err) = tauri::async_runtime::block_on(backend.call(quit)) {
                     log::warn!("couldn't turn off: {err}");
