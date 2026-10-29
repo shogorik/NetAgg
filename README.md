@@ -170,12 +170,16 @@ Everything is on the [latest release](https://github.com/shogorik/NetAgg/release
 
 ### Linux
 
-Two packages for Ubuntu 24.04 and newer (64-bit). They can't be installed side by side.
+Two packages for Ubuntu 24.04 and newer (64-bit). They can't be installed side by side. Download the package into
+`/tmp` and install it from there, as below: apt reads it as its own unprivileged user (`_apt`), which can't open your
+home folder. Installed from your home folder it still works, but apt prints a harmless "Permission denied" notice.
 
 - **`NetAgg_<version>_amd64.deb` (package `net-agg`) for Ubuntu Desktop:** the tray icon and popup, with the engine
   in a background service. Changing DNS settings asks for your password, as Windows asks for administrator approval.
 
   ```bash
+  cd /tmp
+  wget https://github.com/shogorik/NetAgg/releases/download/v<version>/NetAgg_<version>_amd64.deb
   sudo apt install ./NetAgg_<version>_amd64.deb
   ```
 
@@ -185,6 +189,8 @@ Two packages for Ubuntu 24.04 and newer (64-bit). They can't be installed side b
   `https://<server>:8443`. No GTK or WebKit needed.
 
   ```bash
+  cd /tmp
+  wget https://github.com/shogorik/NetAgg/releases/download/v<version>/netagg-server_<version>_amd64.deb
   sudo apt install ./netagg-server_<version>_amd64.deb
   sudo netagg-server webui-password
   ```

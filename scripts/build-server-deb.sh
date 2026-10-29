@@ -71,7 +71,7 @@ cat > "$ROOT/DEBIAN/postinst" <<'EOF'
 set -e
 if [ "$1" = configure ]; then
     if ! getent passwd netagg-web >/dev/null; then
-        adduser --system --group --no-create-home --home /nonexistent netagg-web
+        adduser --system --stdoutmsglevel=warn --group --no-create-home --home /nonexistent netagg-web
     fi
     if [ -d /run/systemd/system ]; then
         systemctl daemon-reload

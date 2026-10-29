@@ -8,7 +8,7 @@ if [ "$1" = configure ]; then
     # Versions before the service gave the binary capabilities instead.
     setcap -r /usr/bin/netagg 2>/dev/null || true
     if ! getent passwd netagg-web >/dev/null; then
-        adduser --system --group --no-create-home --home /nonexistent netagg-web
+        adduser --system --stdoutmsglevel=warn --group --no-create-home --home /nonexistent netagg-web
     fi
     if [ -d /run/systemd/system ]; then
         systemctl daemon-reload
