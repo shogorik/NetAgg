@@ -89,13 +89,9 @@ pub fn capacities(candidates: &[Candidate]) -> Vec<f64> {
         .collect()
 }
 
-/// The link where one more flow can expect the most bandwidth:
-/// `weight × capacity / (busy + 1)`. Without adaptive weighting every
-/// capacity counts as equal, which makes this weighted least-busy.
-///
-/// Giving a link more flows lowers its score, so busy flows settle in
-/// proportion to `weight × capacity` instead of piling onto one link.
-pub fn pick<'a>(candidates: &[Candidate<'a>], adaptive: bool) -> Option<&'a str> {
+/// Each link's share of the flows, `weight × capacity`: the proportion busy
+/// flows settle in, which Settings shows beside each weight.
+pub fn shares(candidates: &[Candidate], adaptive: bool) -> Vec<f64> {
     let capacity = if adaptive {
         capacities(candidates)
     } else {
@@ -104,10 +100,21 @@ pub fn pick<'a>(candidates: &[Candidate<'a>], adaptive: bool) -> Option<&'a str>
     candidates
         .iter()
         .zip(capacity)
-        .map(|(c, capacity)| {
-            let share = c.weight.max(1) as f64 * capacity;
-            (share / (c.busy as f64 + 1.0), share, c.rank, c.id)
-        })
+        .map(|(c, capacity)| c.weight.max(1) as f64 * capacity)
+        .collect()
+}
+
+/// The link where one more flow can expect the most bandwidth:
+/// `weight × capacity / (busy + 1)`. Without adaptive weighting every
+/// capacity counts as equal, which makes this weighted least-busy.
+///
+/// Giving a link more flows lowers its score, so busy flows settle in
+/// proportion to `weight × capacity` instead of piling onto one link.
+pub fn pick<'a>(candidates: &[Candidate<'a>], adaptive: bool) -> Option<&'a str> {
+    candidates
+        .iter()
+        .zip(shares(candidates, adaptive))
+        .map(|(c, share)| (share / (c.busy as f64 + 1.0), share, c.rank, c.id))
         // Most room first; on a tie, the bigger share, then the better kind
         // of network (never the phone just because of its id), then a
         // stable order.
@@ -213,6 +220,20 @@ mod tests {
         slow.busy = 1;
         let counts = distribute(vec![fast, slow], 38, true);
         assert_eq!(counts, vec![30, 10]);
+    }
+
+    #[test]
+    fn shares_are_the_split_busy_flows_settle_in() {
+        let mut fast = candidate("fast", 4);
+        fast.peak_rx = 30 * MB;
+        let mut slow = candidate("slow", 8);
+        slow.peak_rx = 10 * MB;
+        // What Settings shows: weights alone, then weights times speed.
+        assert_eq!(shares(&[fast.clone(), slow.clone()], false), vec![4.0, 8.0]);
+        let [f, s] = shares(&[fast, slow], true)[..] else {
+            panic!("two shares")
+        };
+        assert_eq!(f / s, 1.5);
     }
 
     #[test]

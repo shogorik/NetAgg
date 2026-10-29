@@ -23,6 +23,7 @@ const wifi: LinkStatus = {
   rxRate: 0,
   txRate: 0,
   share: 0,
+  newShare: 0,
   connections: 0,
 };
 const phone: LinkStatus = { ...wifi, id: "2", name: "Phone", kind: "phone", isDefault: false };

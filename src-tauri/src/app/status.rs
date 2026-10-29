@@ -11,6 +11,7 @@ use serde_json::Value;
 use super::settings::Settings;
 use super::state::AppState;
 use crate::engine::{TUN_V4, TUN_V6};
+use crate::net::balancer::{self, Candidate};
 use crate::net::dns::DnsMode;
 use crate::net::links::HealthState;
 use crate::net::router::Proto;
@@ -93,6 +94,10 @@ pub struct LinkStatus {
     pub tx_rate: u64,
     /// Percent of the current traffic, for the share ring.
     pub share: u8,
+    /// Percent of the busy connections it gets: its weight times, with
+    /// adaptive weighting, the download speed it has shown. 0 when it can't
+    /// take any (off, unplugged or without internet).
+    pub new_share: u8,
     pub connections: u32,
 }
 
@@ -225,6 +230,7 @@ pub fn build(state: &AppState) -> Status {
                 rx_rate,
                 tx_rate,
                 share: 0,
+                new_share: 0,
                 connections: link.stats.tcp_active.load(Ordering::Relaxed)
                     + link.stats.udp_active.load(Ordering::Relaxed),
             }
@@ -239,6 +245,32 @@ pub fn build(state: &AppState) -> Status {
     }
     for (link, share) in links.iter_mut().zip(percents(&basis)) {
         link.share = share;
+    }
+    // Where busy connections settle (`balancer::pick`), among the links it may use.
+    let all = state.links.all();
+    let usable: Vec<_> = all
+        .iter()
+        .filter(|l| l.usable() && settings.link(&l.id).enabled)
+        .collect();
+    let candidates: Vec<Candidate> = usable
+        .iter()
+        .map(|l| Candidate {
+            id: &l.id,
+            weight: settings.link(&l.id).weight,
+            busy: 0,
+            peak_rx: l.capacity_estimate(),
+            rank: 0,
+        })
+        .collect();
+    // Scaled up so weights alone (capacity 1 until a speed is known) still split finely.
+    let parts: Vec<u64> = balancer::shares(&candidates, settings.adaptive)
+        .into_iter()
+        .map(|s| (s * 1000.0) as u64)
+        .collect();
+    for (candidate, new_share) in candidates.iter().zip(percents(&parts)) {
+        if let Some(link) = links.iter_mut().find(|l| l.id == candidate.id) {
+            link.new_share = new_share;
+        }
     }
     // The default network first, then connected ones, as in the design.
     links.sort_by_key(|l| (!l.is_default, !l.present));
@@ -482,6 +514,7 @@ mod tests {
             rx_rate: 0,
             tx_rate: 0,
             share: 0,
+            new_share: 0,
             connections: 0,
         };
         let links = [

@@ -23,6 +23,7 @@ const link = (over: Partial<LinkStatus>): LinkStatus => ({
   rxRate: 0,
   txRate: 0,
   share: 0,
+  newShare: 0,
   connections: 0,
   ...over,
 });

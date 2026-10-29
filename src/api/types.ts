@@ -40,6 +40,8 @@ export interface LinkStatus {
   txRate: number;
   /** Percent of the current traffic. */
   share: number;
+  /** Percent of busy connections it gets: its weight times, with adaptive weighting, its measured speed. */
+  newShare: number;
   connections: number;
 }
 

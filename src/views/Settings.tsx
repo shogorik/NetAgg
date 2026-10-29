@@ -136,6 +136,8 @@ export function Settings({ status, onStatus, onBack, update, columns = false }: 
                     name={link.name}
                     color={colors.get(link.id) ?? "var(--text-3)"}
                     weight={link.weight}
+                    newShare={link.newShare}
+                    adaptive={settings.adaptive}
                     onCommit={(weight) =>
                       setLinkWeight(link.id, weight)
                         .then(onStatus)
@@ -249,11 +251,14 @@ interface WeightRowProps {
   name: string;
   color: string;
   weight: number;
+  /** Percent of busy connections it actually gets; 0 when it takes none. */
+  newShare: number;
+  adaptive: boolean;
   onCommit: (weight: number) => Promise<unknown>;
 }
 
 /** A 1–10 slider that only tells the backend once the user pauses. */
-function WeightRow({ name, color, weight, onCommit }: WeightRowProps) {
+function WeightRow({ name, color, weight, newShare, adaptive, onCommit }: WeightRowProps) {
   const [draft, setDraft] = useState<number | null>(null);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
@@ -274,7 +279,16 @@ function WeightRow({ name, color, weight, onCommit }: WeightRowProps) {
           <span className="dot" style={{ background: color }} />
           {name}
         </span>
-        <span className="weight-value">{value} / 10</span>
+        <span
+          className="weight-value"
+          title={
+            adaptive
+              ? "Its share of busy connections: this weight times the speed it has shown"
+              : "Its share of busy connections, from the weights"
+          }
+        >
+          {value} / 10{newShare > 0 && draft === null ? ` · ${newShare}%` : ""}
+        </span>
       </div>
       <input
         type="range"
