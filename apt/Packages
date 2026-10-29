@@ -1,0 +1,40 @@
+Package: netagg-apt
+Version: 2.0.5
+Architecture: all
+Maintainer: shogorik <46198806+shogorik@users.noreply.github.com>
+Installed-Size: 44
+Filename: ./netagg-apt_2.0.5_all.deb
+Size: 2210
+MD5sum: 98c862be327c71ec165df080c27fe89e
+SHA1: 9a3631ba4885665fa3c905c0463dccb9bc3cf3b4
+SHA256: 1f71cd402db6b94f927139c5a926ae357fb1723353f1f044d9c5919fb1ee68f7
+Section: admin
+Priority: optional
+Homepage: https://github.com/shogorik/NetAgg
+Description: NetAgg's apt repository, for updates with apt upgrade
+ Adds https://shogorik.github.io/NetAgg/apt/ to apt, trusted only with
+ NetAgg's repository key (fingerprint DF0A7B1B56911A8C9AC36D0FBC70009B27204C25),
+ so new netagg-server versions come with "sudo apt update && sudo apt
+ upgrade". Remove it to stop; purge it to remove the source and the key.
+
+Package: netagg-server
+Version: 2.0.5
+Architecture: amd64
+Maintainer: shogorik <46198806+shogorik@users.noreply.github.com>
+Installed-Size: 9172
+Depends: libc6 (>= 2.39), nftables, iproute2, adduser
+Conflicts: net-agg
+Filename: ./netagg-server_2.0.5_amd64.deb
+Size: 2740438
+MD5sum: e45d12fb1937e201de8d4ead0af5f6cb
+SHA1: 5852d29b92e2e70b86ee170c795637bdb1c1c954
+SHA256: 18e8b5c9277d1526bce8cff770fc3240f676dd838daa787fba1a36f04235a2f2
+Section: net
+Priority: optional
+Homepage: https://github.com/shogorik/NetAgg
+Description: NetAgg for headless servers: combine several networks
+ Spreads the whole machine's connections across Wi-Fi, Ethernet and a
+ USB-tethered phone at once. This package runs NetAgg as a service with a
+ WebUI on port 8443 (HTTPS, password-protected, local networks only);
+ set its password with: sudo netagg-server webui-password
+
