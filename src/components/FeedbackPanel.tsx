@@ -53,17 +53,22 @@ export function FeedbackPanel({ status }: { status: Status }) {
                 : "The same info the form starts with, to paste where you need it."}
           </span>
         </div>
-        <label className="notice-check">
-          <input
-            type="checkbox"
-            checked={detailed}
-            onChange={(e) => {
-              setDetailed(e.target.checked);
-              setCopied(null);
-            }}
-          />
-          Include diagnostics
-        </label>
+        <div className="notice-actions">
+          <label className="notice-check">
+            <input
+              type="checkbox"
+              checked={detailed}
+              onChange={(e) => {
+                setDetailed(e.target.checked);
+                setCopied(null);
+              }}
+            />
+            Include diagnostics
+          </label>
+          <button type="button" className="secondary-button" onClick={copy}>
+            {detailed ? "Copy with diagnostics" : "Copy"}
+          </button>
+        </div>
         {detailed && (
           <div className="notice feedback-warning" role="alert">
             Diagnostics add each network&apos;s name, whether it&apos;s in use and reaches the internet, its link
@@ -72,11 +77,6 @@ export function FeedbackPanel({ status }: { status: Status }) {
             No addresses. Pasted into the report, all of it becomes public in that issue.
           </div>
         )}
-        <div className="update-actions">
-          <button type="button" className="secondary-button" onClick={copy}>
-            {detailed ? "Copy with diagnostics" : "Copy"}
-          </button>
-        </div>
       </div>
     </>
   );
