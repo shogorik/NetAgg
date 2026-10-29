@@ -45,6 +45,28 @@ export function Settings({ status, onStatus, onBack, update, columns = false }: 
       .catch((e) => setError(errorText(e)));
   };
 
+  const app = (
+    <>
+      <div className="divider" />
+      <Section title="App">
+        {!inBrowser && (
+          <SwitchRow
+            label={startAtLoginLabel(status)}
+            on={settings.startOnLogin}
+            onChange={(startOnLogin) => change({ startOnLogin })}
+          />
+        )}
+        <SwitchRow
+          label="Hide unavailable networks"
+          desc="Leaves unplugged cables and networks that aren't connected out of the list."
+          on={settings.hideUnavailable}
+          onChange={(hideUnavailable) => change({ hideUnavailable })}
+        />
+        {!inBrowser && status.platform === "linux" && <WebUiSettings status={status} />}
+      </Section>
+    </>
+  );
+
   return (
     <>
       <SubHeader title="Settings" onBack={onBack} onMinimize={hidePopup} />
@@ -124,26 +146,11 @@ export function Settings({ status, onStatus, onBack, update, columns = false }: 
               </Section>
             </>
           )}
-
+          {/* Side by side (a wide browser window), App evens out the two columns. */}
+          {columns && app}
         </div>
         <div className="settings-col">
-          <div className="divider" />
-          <Section title="App">
-            {!inBrowser && (
-              <SwitchRow
-                label={startAtLoginLabel(status)}
-                on={settings.startOnLogin}
-                onChange={(startOnLogin) => change({ startOnLogin })}
-              />
-            )}
-            <SwitchRow
-              label="Hide unavailable networks"
-              desc="Leaves unplugged cables and networks that aren't connected out of the list."
-              on={settings.hideUnavailable}
-              onChange={(hideUnavailable) => change({ hideUnavailable })}
-            />
-            {!inBrowser && status.platform === "linux" && <WebUiSettings status={status} />}
-          </Section>
+          {!columns && app}
 
           <div className="divider" />
           <Section title="DNS">
