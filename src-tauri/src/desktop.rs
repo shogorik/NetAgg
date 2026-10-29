@@ -52,6 +52,7 @@ pub fn run() {
         // NetAgg restarts.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(popup::PopupState::default())
         .invoke_handler(tauri::generate_handler![
             popup::fit_popup,

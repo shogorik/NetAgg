@@ -11,6 +11,7 @@ import { errorText, setDefaultLink, setLinkLabel, setLinkWeight, setOption } fro
 import { inBrowser } from "../api/transport";
 import type { LinkStatus, OptionChange, Status } from "../api/types";
 import { hidePopup } from "../api/window";
+import { FeedbackPanel } from "../components/FeedbackPanel";
 import { SubHeader } from "../components/Header";
 import { Toggle } from "../components/Toggle";
 import { UpdatePanel } from "../components/UpdatePanel";
@@ -176,6 +177,11 @@ export function Settings({ status, onStatus, onBack, update, columns = false }: 
               on={settings.checkUpdates}
               onChange={(checkUpdates) => change({ checkUpdates })}
             />
+          </Section>
+
+          <div className="divider" />
+          <Section title="Feedback">
+            <FeedbackPanel status={status} />
           </Section>
           {inBrowser && (
             <>

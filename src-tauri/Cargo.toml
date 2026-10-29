@@ -24,7 +24,7 @@ required-features = ["server"]
 
 [features]
 default = ["gui"]
-gui = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-updater", "dep:tauri-plugin-process", "dep:ksni"]
+gui = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-updater", "dep:tauri-plugin-process", "dep:tauri-plugin-opener", "dep:ksni"]
 # The WebUI (Linux): netagg-server's, and the desktop app's, switched off until Settings turns it on.
 webui = ["dep:argon2", "dep:rcgen", "hyper/server"]
 server = ["webui"]
@@ -45,6 +45,8 @@ etherparse = "0.20"
 log = { version = "0.4", features = ["std"] }
 tauri-plugin-updater = { version = "2.14.0", optional = true }
 tauri-plugin-process = { version = "2.4.0", optional = true }
+# Report a bug: opens GitHub's new-issue page in the browser (capabilities limit it to that page).
+tauri-plugin-opener = { version = "2.7.2", optional = true }
 # DNS-over-TLS and DNS-over-HTTPS upstreams (ring, not aws-lc; the updater uses the same).
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
