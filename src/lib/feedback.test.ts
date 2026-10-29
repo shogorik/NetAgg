@@ -69,6 +69,12 @@ describe("bug report", () => {
     expect(url.searchParams.get("version")).toBe("2.0.4");
     expect(url.searchParams.get("system")).toBe("Linux (WebUI)");
     expect(url.searchParams.get("basic")).toBe(basicInfo(status, true));
+    expect(url.searchParams.has("diagnostics")).toBe(false);
+  });
+
+  it("fills in the diagnostics only when asked", () => {
+    const url = new URL(bugReportUrl(status, false, true));
+    expect(url.searchParams.get("diagnostics")).toBe(diagnostics(status));
   });
 
   it("describes the setup in counts and switches", () => {

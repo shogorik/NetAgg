@@ -18,14 +18,18 @@ export function runsOn(status: Status, inBrowser: boolean): string {
   return inBrowser ? `${os} (WebUI)` : os;
 }
 
-/** The bug report form, with the version, system and basic info filled in (.github/ISSUE_TEMPLATE/bug.yml). */
-export function bugReportUrl(status: Status, inBrowser: boolean): string {
+/**
+ * The bug report form (.github/ISSUE_TEMPLATE/bug.yml) with the version, system and basic info filled in, and
+ * the diagnostics too when the user ticked them.
+ */
+export function bugReportUrl(status: Status, inBrowser: boolean, withDiagnostics = false): string {
   const query = new URLSearchParams({
     template: "bug.yml",
     version: status.version,
     system: runsOn(status, inBrowser),
     basic: basicInfo(status, inBrowser),
   });
+  if (withDiagnostics) query.set("diagnostics", diagnostics(status));
   return `${NEW_ISSUE}?${query}`;
 }
 
@@ -59,7 +63,7 @@ export function basicInfo(status: Status, inBrowser: boolean): string {
 }
 
 /**
- * Added only when the user ticks "Include diagnostics", after a warning: each network by its name, how it
+ * Filled in only when the user ticks "Include diagnostics", after a warning: each network by its name, how it
  * is doing, the DNS servers and the error showing. Still never an address (IP, gateway, provider hop).
  */
 export function diagnostics(status: Status): string {

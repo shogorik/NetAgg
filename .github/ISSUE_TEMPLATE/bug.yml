@@ -41,13 +41,13 @@ body:
     id: basic
     attributes:
       label: Basic info
-      description: Filled in by NetAgg's **Report** button (or Settings → Feedback → **Copy basic info**). Versions, settings and how many networks of each kind; no names or addresses.
+      description: Filled in by NetAgg's Settings → Feedback → **Report**. Versions, settings and how many networks of each kind; no names or addresses.
       render: text
   - type: textarea
     id: diagnostics
     attributes:
       label: Diagnostics (optional)
-      description: Settings → Feedback → tick **Include diagnostics**, then **Copy with diagnostics**. It adds your networks' names, speeds and response times, your DNS servers and the error NetAgg shows. Everything here is public.
+      description: Filled in when **Include diagnostics** is ticked before **Report**. It holds your networks' names, speeds and response times, your DNS servers and the error NetAgg shows. Everything here is public, so remove what you'd rather keep private.
       render: text
   - type: checkboxes
     id: public
