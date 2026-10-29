@@ -1,6 +1,8 @@
 node_modules/
 dist/
 src-tauri/target/
+# A machine's own build settings, such as building outside a synced folder.
+/.cargo/
 src-tauri/gen/schemas/
 *.log
 .claude/settings.local.json

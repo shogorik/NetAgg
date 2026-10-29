@@ -63,6 +63,9 @@ if [[ -f "$KEY.pub" && "$(tr -d '\r\n' < "$KEY.pub")" != "$CONF_PUBKEY" ]]; then
 fi
 [[ "$(node -p 'require("./package.json").version')" == "$VERSION" ]] || die "package.json version isn't $VERSION"
 grep -q "^version = \"$VERSION\"" src-tauri/Cargo.toml || die "Cargo.toml version isn't $VERSION"
+# Where cargo builds: src-tauri/target, unless a local .cargo/config.toml or CARGO_TARGET_DIR moves it.
+TARGET_DIR="$(cd src-tauri && cargo metadata --format-version 1 --no-deps |
+  node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).target_directory.replace(/\\/g, "/")')"
 
 # Each system: its build target, and "feed key=bundle file" for every updater bundle it makes.
 # The updater looks for {os}-{arch}-{installer} first, then {os}-{arch}.
@@ -71,14 +74,14 @@ case "$(uname -s)" in
   Darwin)
     [[ "$(stat -f %Lp "$KEY")" == "600" ]] || die "$KEY must be mode 0600 (chmod 600 '$KEY')"
     TARGET="aarch64-apple-darwin"
-    BUNDLE="src-tauri/target/$TARGET/release/bundle"
+    BUNDLE="$TARGET_DIR/$TARGET/release/bundle"
     EXTRA=("dmg/NetAgg_${VERSION}_aarch64.dmg")
     FEED=("darwin-aarch64-app=macos/NetAgg.app.tar.gz" "darwin-aarch64=macos/NetAgg.app.tar.gz")
     ;;
   Linux)
     [[ "$(stat -c %a "$KEY")" == "600" ]] || die "$KEY must be mode 0600 (chmod 600 '$KEY')"
     TARGET="x86_64-unknown-linux-gnu"
-    BUNDLE="src-tauri/target/$TARGET/release/bundle"
+    BUNDLE="$TARGET_DIR/$TARGET/release/bundle"
     EXTRA=()
     FEED=(
       "linux-x86_64-deb=deb/NetAgg_${VERSION}_amd64.deb"
@@ -87,7 +90,7 @@ case "$(uname -s)" in
     ;;
   MINGW* | MSYS* | CYGWIN*)
     TARGET="x86_64-pc-windows-msvc"
-    BUNDLE="src-tauri/target/$TARGET/release/bundle"
+    BUNDLE="$TARGET_DIR/$TARGET/release/bundle"
     EXTRA=()
     FEED=(
       "windows-x86_64-nsis=nsis/NetAgg_${VERSION}_x64-setup.exe"
