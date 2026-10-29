@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LinkStatus, Status } from "../api/types";
-import { bugReportUrl, diagnostics } from "./feedback";
+import { basicInfo, bugReportUrl, diagnostics } from "./feedback";
 
 const link = (over: Partial<LinkStatus>): LinkStatus => ({
   id: "1",
@@ -62,16 +62,17 @@ const status: Status = {
 };
 
 describe("bug report", () => {
-  it("fills in the version and system", () => {
+  it("fills in the version, system and basic info", () => {
     const url = new URL(bugReportUrl(status, true));
     expect(url.origin + url.pathname).toBe("https://github.com/shogorik/NetAgg/issues/new");
     expect(url.searchParams.get("template")).toBe("bug.yml");
     expect(url.searchParams.get("version")).toBe("2.0.4");
     expect(url.searchParams.get("system")).toBe("Linux (WebUI)");
+    expect(url.searchParams.get("basic")).toBe(basicInfo(status, true));
   });
 
   it("describes the setup in counts and switches", () => {
-    expect(diagnostics(status, false)).toBe(
+    expect(basicInfo(status, false)).toBe(
       [
         "NetAgg 2.0.4 on Linux",
         "NetAgg: on, 12 connections, IPv6 not available",
@@ -82,10 +83,27 @@ describe("bug report", () => {
     );
   });
 
-  it("never carries names, addresses, DNS servers or error texts", () => {
-    const text = diagnostics(status, true);
-    for (const secret of ["Home Wi-Fi", "Desk cable", "Old phone", "Intel", "192.168", "203.0.113", "198.51.100", "dns.example", "private-id"]) {
-      expect(text).not.toContain(secret);
+  it("never carries names, addresses, DNS servers or error texts by default", () => {
+    const url = decodeURIComponent(bugReportUrl(status, true));
+    for (const text of [basicInfo(status, true), url]) {
+      for (const secret of ["Home Wi-Fi", "Desk cable", "Old phone", "Intel", "192.168", "203.0.113", "198.51.100", "dns.example", "private-id"]) {
+        expect(text).not.toContain(secret);
+      }
     }
+  });
+
+  it("adds names, health, DNS servers and the error only with diagnostics, never addresses", () => {
+    const text = diagnostics(status);
+    expect(text).toBe(
+      [
+        "Networks:",
+        "- Home Wi-Fi 5G (Wi-Fi): in use, internet up, 18 ms, weight 5/10, 0% of traffic, 0 connections, Router 2 ms · ISP 9 ms · Cloudflare 20 ms · AdGuard 30 ms",
+        "- Desk cable (Ethernet): in use, internet down, 18 ms, weight 5/10, 0% of traffic, 0 connections, Router 2 ms · ISP 9 ms · Cloudflare 20 ms · AdGuard 30 ms",
+        "- Old phone (phone): not connected",
+        "DNS servers: https://dns.example/dns-query/private-id#198.51.100.53",
+        "Error showing: Couldn't reach https://dns.example/dns-query/private-id",
+      ].join("\n"),
+    );
+    for (const address of ["192.168", "203.0.113"]) expect(text).not.toContain(address);
   });
 });

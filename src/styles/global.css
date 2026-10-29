@@ -690,6 +690,11 @@ button.setting-row:hover {
   gap: 8px;
 }
 
+/* Inside a settings row, which has its own padding. */
+.notice.feedback-warning {
+  margin: 0;
+}
+
 .update-notes {
   max-height: 96px;
   overflow-y: auto;

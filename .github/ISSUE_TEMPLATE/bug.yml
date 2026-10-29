@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for reporting. **This report is public**: leave out names, addresses, DNS servers and anything else
-        you'd rather keep to yourself. NetAgg's Settings → Feedback → **Report** fills in the version and system.
+        you'd rather keep to yourself. NetAgg's Settings → Feedback → **Report** fills in the version, system and basic info.
   - type: textarea
     id: what
     attributes:
@@ -38,10 +38,16 @@ body:
     validations:
       required: true
   - type: textarea
+    id: basic
+    attributes:
+      label: Basic info
+      description: Filled in by NetAgg's **Report** button (or Settings → Feedback → **Copy basic info**). Versions, settings and how many networks of each kind; no names or addresses.
+      render: text
+  - type: textarea
     id: diagnostics
     attributes:
       label: Diagnostics (optional)
-      description: Settings → Feedback → **Copy diagnostics**, pasted here. It lists versions, settings and how many networks of each kind, no names or addresses.
+      description: Settings → Feedback → tick **Include diagnostics**, then **Copy with diagnostics**. It adds your networks' names, speeds and response times, your DNS servers and the error NetAgg shows. Everything here is public.
       render: text
   - type: checkboxes
     id: public
